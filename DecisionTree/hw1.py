@@ -186,12 +186,37 @@ def read_description(file_name):
     
     return attributes
 
-def train_tree(purity_measure, max_depth):
-    attributes = ["buying", "maint", "doors", "persons", "lug_boot", "safety", "label"]
-    examples = read_examples("car/train.csv", attributes)
-    attributes = read_description("car/data-desc.txt")
+def read_bank_description(file_name):
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_directory, file_name)
 
-    tree = ID3(examples, attributes, purity_measure, max_depth)
+    attributes = {}
+
+    with open (file_path, 'r') as f:
+        for line in f:
+            if "-" in line:
+                index = line.index("-")
+                line = line[index+2:]
+
+                values = line.strip().split(':')
+                values[0] = values[0].strip()
+
+                if "numeric" in line:
+                    attr_vals = values[1]
+                    attributes[values[0]] = ['numeric']
+                else:
+                    attr_vals = values[2]
+                    index_of_quote = attr_vals.index('"')
+                    attr_vals = attr_vals[index_of_quote:len(attr_vals) - 1]
+                    attr_vals = attr_vals.replace('"', '')
+                    attr_vals = attr_vals.split(',')
+                    attributes[values[0]] = attr_vals
+    
+    return attributes
+
+def train_tree(train_data, purity_measure, max_depth):
+    attributes = read_description("car/data-desc.txt")
+    tree = ID3(train_data, attributes, purity_measure, max_depth)
     return tree
 
 def predict(tree, example):
@@ -203,7 +228,6 @@ def predict(tree, example):
     return current_subtree.label
 
 def percent_predicted_correct(tree, examples):
-
     num_examples = len(examples)
     num_right = 0
     for example in examples:
@@ -213,16 +237,131 @@ def percent_predicted_correct(tree, examples):
 
     return num_right / num_examples
 
+def evaluate_car_tree(purity_measures):
+    attributes = ["buying", "maint", "doors", "persons", "lug_boot", "safety", "label"]
+    train_data = read_examples("car/train.csv", attributes)
+    test_data = read_examples("car/test.csv", attributes)
+
+    attributes = read_description("car/data-desc.txt")
+    for purity_measure in purity_measures:
+        for depth in range(6):
+            tree = ID3(train_data, attributes, purity_measure, depth + 1)
+            test_err = percent_predicted_correct(tree, test_data)
+            train_err = percent_predicted_correct(tree, train_data)
+
+            class_name = purity_measure.__class__.__name__
+            print(f"Purity: {class_name}, Depth: {depth + 1}, Test Error: {test_err}, Train Error: {train_err}")
+        
+        print("")
+
+def numeric_to_categorical(train_data, test_data, attributes):
+    for name, vals in attributes.items():
+        if vals[0] == 'numeric':
+            numeric_vals = []
+            for example in train_data:
+                numeric_vals.append(float(example[name]))
+            
+            numeric_vals = sorted(numeric_vals)
+            mid = int(len(numeric_vals) / 2)
+            median = numeric_vals[mid]
+            if len(numeric_vals) % 2 == 0:
+                median = (median + numeric_vals[mid - 1]) / 2
+
+            for example in train_data:
+                if float(example[name]) > median:
+                    example[name] = 'bigger'
+                else:
+                    example[name] = 'smaller'
+
+            for example in test_data:
+                if float(example[name]) > median:
+                    example[name] = 'bigger'
+                else:
+                    example[name] = 'smaller'
+            
+            attributes[name] = ['bigger', 'smaller']
+
+def update_unknown_values(train_data, test_data, attributes):
+    majority_values = {}
+
+    for name, vals in attributes.items():
+        if 'unknown' in vals:
+            vals.remove('unknown')
+
+    for name, vals in attributes.items():
+        majority_values[name] = {}
+        for val in vals:
+            majority_values[name][val] = 0
+
+    for example in train_data:
+        for name, val in example.items():
+            if name != 'label':
+                if val != 'unknown':
+                    majority_values[name][val] = majority_values[name][val] + 1
+
+    for attr, val_counts in majority_values.items():
+        best_count = 0
+        best_val = ""
+        for val, count in val_counts.items():
+            if count > best_count:
+                best_count = count
+                best_val = val
+        
+        majority_values[attr] = best_val
+
+    for example in train_data:
+        for attr, val in example.items():
+            if val == 'unknown':
+                example[attr] = majority_values[attr]
+
+    for example in test_data:
+        for attr, val in example.items():
+            if val == 'unknown':
+                example[attr] = majority_values[attr]
+
+def evaluate_bank_tree(purity_measures):
+
+    attributes = read_bank_description("bank/data-desc.txt")
+    attribute_names = list(attributes.keys())
+    train_data = read_examples("bank/train.csv", attribute_names)
+    test_data = read_examples("bank/test.csv", attribute_names)
+
+    numeric_to_categorical(train_data, test_data, attributes)
+
+    attributes.pop('label')
+
+    for purity_measure in purity_measures:
+        for depth in range(16):
+            tree = ID3(train_data, attributes, purity_measure, depth + 1)
+            test_err = percent_predicted_correct(tree, test_data)
+            train_err = percent_predicted_correct(tree, train_data)
+
+            class_name = purity_measure.__class__.__name__
+            print(f"Purity: {class_name}, Depth: {depth + 1}, Test Error: {test_err}, Train Error: {train_err}")
+        
+        print("")
+
+    update_unknown_values(train_data, test_data, attributes)
+
+    for purity_measure in purity_measures:
+        for depth in range(16):
+            tree = ID3(train_data, attributes, purity_measure, depth + 1)
+            test_err = percent_predicted_correct(tree, test_data)
+            train_err = percent_predicted_correct(tree, train_data)
+
+            class_name = purity_measure.__class__.__name__
+            print(f"Purity: {class_name}, Depth: {depth + 1}, Test Error: {test_err}, Train Error: {train_err}")
+        
+        print("")
+
 def main():
     purity_measures = []
     purity_measures.append(GiniIndex())
     purity_measures.append(MajorityError())
     purity_measures.append(InformationGain())
 
-    for purity_measure in purity_measures:
-        for depth in range(6):
-            tree = train_tree(purity_measure, depth + 1)
-
+    evaluate_bank_tree(purity_measures)
+    evaluate_car_tree(purity_measures)
 
 if __name__ == "__main__":
     main()
