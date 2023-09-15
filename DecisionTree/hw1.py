@@ -247,23 +247,10 @@ def evaluate_car_tree(purity_measures):
     attributes = ["buying", "maint", "doors", "persons", "lug_boot", "safety", "label"]
     train_data = read_examples("car/train.csv", attributes)
     test_data = read_examples("car/test.csv", attributes)
+    attributes = read_car_description("car/data-desc.txt")
 
     print("Evalutating car data:\n")
-
-    attributes = read_car_description("car/data-desc.txt")
-    for purity_measure in purity_measures:
-        class_name = purity_measure.__class__.__name__
-        print(f"Purity: {class_name}")
-
-        for depth in range(6):
-            tree = ID3(train_data, attributes, purity_measure, depth + 1)
-            test_err = percent_predicted_correct(tree, test_data)
-            train_err = percent_predicted_correct(tree, train_data)
-
-            class_name = purity_measure.__class__.__name__
-            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
-        
-        print("")
+    print_err(purity_measures, train_data, attributes, test_data, 6)
 
 # converts numeric data to categorical by comparing numeric values to median and 
 # determining if the value is bigger or smaller than the median
@@ -333,6 +320,28 @@ def update_unknown_values(train_data, test_data, attributes):
             if val == 'unknown':
                 example[attr] = majority_values[attr]
 
+def print_err(purity_measures, train_data, attributes, test_data, max_depth):
+    for purity_measure in purity_measures:
+        class_name = purity_measure.__class__.__name__
+        print(f"Purity: {class_name}")
+
+        average_test_err = 0
+        average_train_err = 0
+        for depth in range(max_depth):
+            tree = ID3(train_data, attributes, purity_measure, depth + 1)
+            test_err = percent_predicted_correct(tree, test_data)
+            train_err = percent_predicted_correct(tree, train_data)
+
+            average_test_err += test_err
+            average_train_err += train_err
+
+            class_name = purity_measure.__class__.__name__
+            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
+
+        print("")
+        print(f"Average Test Error: {(average_test_err/max_depth):.4f}, Average Train Error: {(average_train_err/max_depth):.4f}")
+        print("")
+
 def evaluate_bank_tree(purity_measures):
 
     attributes = read_bank_description("bank/data-desc.txt")
@@ -345,35 +354,12 @@ def evaluate_bank_tree(purity_measures):
     attributes.pop('label')
 
     print("Evalutating bank data with 'unknown' as an attribute value:\n")
-
-    for purity_measure in purity_measures:
-        class_name = purity_measure.__class__.__name__
-        print(f"Purity: {class_name}")
-        for depth in range(16):
-            tree = ID3(train_data, attributes, purity_measure, depth + 1)
-            test_err = percent_predicted_correct(tree, test_data)
-            train_err = percent_predicted_correct(tree, train_data)
-
-            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
-        
-        print("")
+    print_err(purity_measures, train_data, attributes, test_data, 16)
 
     update_unknown_values(train_data, test_data, attributes)
 
     print("Evalutating bank data with 'unknown' as a missing attribute value:\n")
-
-    for purity_measure in purity_measures:
-        class_name = purity_measure.__class__.__name__
-        print(f"Purity: {class_name}")
-        for depth in range(16):
-            tree = ID3(train_data, attributes, purity_measure, depth + 1)
-            test_err = percent_predicted_correct(tree, test_data)
-            train_err = percent_predicted_correct(tree, train_data)
-
-            class_name = purity_measure.__class__.__name__
-            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
-        
-        print("")
+    print_err(purity_measures, train_data, attributes, test_data, 16)
 
 def main():
     purity_measures = []
