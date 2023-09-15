@@ -241,7 +241,7 @@ def percent_predicted_correct(tree, examples):
         if prediction == example["label"]:
             num_right = num_right + 1
 
-    return num_right / num_examples
+    return 1 - (num_right / num_examples)
 
 def evaluate_car_tree(purity_measures):
     attributes = ["buying", "maint", "doors", "persons", "lug_boot", "safety", "label"]
@@ -261,7 +261,7 @@ def evaluate_car_tree(purity_measures):
             train_err = percent_predicted_correct(tree, train_data)
 
             class_name = purity_measure.__class__.__name__
-            print(f"Depth: {depth + 1}, Test Error: {test_err}, Train Error: {train_err}")
+            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
         
         print("")
 
@@ -354,7 +354,7 @@ def evaluate_bank_tree(purity_measures):
             test_err = percent_predicted_correct(tree, test_data)
             train_err = percent_predicted_correct(tree, train_data)
 
-            print(f"Depth: {depth + 1}, Test Error: {test_err}, Train Error: {train_err}")
+            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
         
         print("")
 
@@ -371,7 +371,7 @@ def evaluate_bank_tree(purity_measures):
             train_err = percent_predicted_correct(tree, train_data)
 
             class_name = purity_measure.__class__.__name__
-            print(f"Depth: {depth + 1}, Test Error: {test_err}, Train Error: {train_err}")
+            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
         
         print("")
 
