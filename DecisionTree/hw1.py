@@ -363,9 +363,9 @@ def evaluate_bank_tree(purity_measures):
 
 def main():
     purity_measures = []
-    purity_measures.append(GiniIndex())
-    purity_measures.append(MajorityError())
     purity_measures.append(InformationGain())
+    purity_measures.append(MajorityError())
+    purity_measures.append(GiniIndex())
 
     evaluate_car_tree(purity_measures)
     evaluate_bank_tree(purity_measures)
