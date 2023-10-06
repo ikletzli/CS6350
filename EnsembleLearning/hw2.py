@@ -1,5 +1,6 @@
 import os
 import math
+import matplotlib.pyplot as plt 
 
 class Node:
     def __init__(self, children, attribute, label):
@@ -45,13 +46,16 @@ class GiniIndex(Purity):
 def get_label_counts(examples):
     label_counts = {}
 
+    counter = 0
     for example in examples:
         # count each label
         label = example["label"]
         if label in label_counts:
-            label_counts[label] = label_counts[label] + 1
+            label_counts[label] = label_counts[label] + example['weight']
         else:
-            label_counts[label] = 1
+            label_counts[label] = example['weight']
+
+        counter += 1
     
     return label_counts
 
@@ -98,12 +102,17 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth):
     # find best attribute using the purity measure
     for attribute in attributes:
         attribute_vals = {}
+        new_weights = []
+
+        counter = 0
         for example in examples:
             if example[attribute] in attribute_vals:
                 attribute_vals[example[attribute]].append(example)
             else:
                 attribute_vals[example[attribute]] = []
                 attribute_vals[example[attribute]].append(example)
+            
+            counter += 1
         
         expectedPurity = 0
         for attribute_val, attr_examples in attribute_vals.items():
@@ -166,7 +175,14 @@ def read_examples(file_name, attributes):
             values = line.strip().split(',')
             example = {}
             for i in range(len(attributes)):
-                example[attributes[i]] = values[i]
+                if attributes[i] == 'label':
+                    if values[i] == 'no':
+                        example[attributes[i]] = -1
+                    else:
+                        example[attributes[i]] = 1
+
+                else:
+                    example[attributes[i]] = values[i]
 
             examples.append(example)
     
@@ -311,8 +327,34 @@ def print_err(purity_measures, train_data, attributes, test_data, max_depth):
         print(f"Average Test Error: {(average_test_err/max_depth):.4f}, Average Train Error: {(average_train_err/max_depth):.4f}")
         print("")
 
-def evaluate_bank_tree(purity_measures):
+def ada_prediction(votes, classifiers, example):
+    sum = 0
+    for i in range(len(classifiers)):
+        sum += votes[i] * predict(classifiers[i], example)
 
+    sign = example['label'] * sum
+
+    if sign > 0:
+        return 1
+    
+    return 0
+
+def print_err_for_one_depth(train_data, test_data, votes, classifiers, t):
+    num_correct = 0
+    for example in train_data:
+        num_correct += ada_prediction(votes, classifiers, example)
+
+    train_err = 1 - (num_correct / len(train_data))
+
+    num_correct = 0
+    for example in test_data:
+        num_correct += ada_prediction(votes, classifiers, example)
+
+    test_err = 1 - (num_correct / len(test_data))
+
+    print(f"T: {t}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
+
+def evaluate_bank_tree():
     attributes = read_bank_description("bank/data-desc.txt")
     attribute_names = list(attributes.keys())
     train_data = read_examples("bank/train.csv", attribute_names)
@@ -323,13 +365,52 @@ def evaluate_bank_tree(purity_measures):
     attributes.pop('label')
 
     print("Evalutating bank data with 'unknown' as an attribute value:\n")
-    print_err(purity_measures, train_data, attributes, test_data, 16)
+
+    for t in range(500):
+        votes, classifiers = ada_boost(train_data, attributes, t + 1)
+        print_err_for_one_depth(train_data, test_data, votes, classifiers, t)
+
+def ada_boost(train_data, attributes, T):
+    weights = [1 / len(train_data)] * len(train_data) 
+
+    for i in range(len(train_data)):
+        train_data[i]['weight'] = weights[i]
+    
+    classifiers = [None] * T 
+    votes = [None] * T 
+    for t in range(T):
+        tree = ID3(train_data, attributes, InformationGain(), 1)
+        classifiers[t] = tree
+
+        err_sum = 0
+        counter = 0
+        for example in train_data:
+            # updates for e_t
+            yi_hxi = example['label'] * predict(tree, example)
+            err_sum += weights[counter] * yi_hxi
+            counter += 1
+            
+        err_t = 0.5 - 0.5 * err_sum
+        votes[t] = 0.5 * math.log((1 - err_t) / err_t)
+
+        weight_sum = 0
+        counter = 0
+        for example in train_data:
+            # updates for D_t+1
+            yi_hxi = example['label'] * predict(tree, example)
+            weights[counter] *= math.exp(-votes[t] * yi_hxi)
+            weight_sum += weights[counter]
+            counter += 1
+
+        weights = [x / weight_sum for x in weights]
+
+        for i in range(len(train_data)):
+            train_data[i]['weight'] = weights[i]
+
+    return votes, classifiers
 
 def main():
-    purity_measures = []
-    purity_measures.append(InformationGain())
-
-    evaluate_bank_tree(purity_measures)
+    evaluate_bank_tree()
 
 if __name__ == "__main__":
     main()
