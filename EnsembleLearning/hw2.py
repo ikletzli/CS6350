@@ -1,6 +1,5 @@
 import os
 import math
-import matplotlib.pyplot as plt 
 
 class Node:
     def __init__(self, children, attribute, label):
@@ -94,7 +93,12 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth):
     # create root node
     root_node = Node(None, None, None)
 
-    total_purity = purity_measure.purity(label_counts, len(examples))
+    total_length = 0
+
+    for label, count in label_counts.items():
+        total_length += count
+
+    total_purity = purity_measure.purity(label_counts, total_length)
 
     best_gain = 0
     best_attribute = attributes[0]
@@ -102,7 +106,6 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth):
     # find best attribute using the purity measure
     for attribute in attributes:
         attribute_vals = {}
-        new_weights = []
 
         counter = 0
         for example in examples:
@@ -117,8 +120,14 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth):
         expectedPurity = 0
         for attribute_val, attr_examples in attribute_vals.items():
             new_label_counts = get_label_counts(attr_examples)
-            purity = purity_measure.purity(new_label_counts, len(attr_examples))
-            weighted_purity = len(attr_examples) / len(examples) * purity
+
+            partial_length = 0
+
+            for label, count in new_label_counts.items():
+                partial_length += count
+
+            purity = purity_measure.purity(new_label_counts, partial_length)
+            weighted_purity = partial_length / total_length * purity
             expectedPurity += weighted_purity
         
         gain = total_purity - expectedPurity
