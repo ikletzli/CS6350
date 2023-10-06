@@ -1,5 +1,7 @@
 import os
 import math
+import matplotlib.pyplot as plt
+import numpy as np
 
 class Node:
     def __init__(self, children, attribute, label):
@@ -362,6 +364,7 @@ def print_err_for_one_depth(train_data, test_data, votes, classifiers, t):
     test_err = 1 - (num_correct / len(test_data))
 
     print(f"T: {t}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
+    return test_err, train_err
 
 def evaluate_bank_tree():
     attributes = read_bank_description("bank/data-desc.txt")
@@ -375,9 +378,27 @@ def evaluate_bank_tree():
 
     print("Evalutating bank data with 'unknown' as an attribute value:\n")
 
-    for t in range(500):
+    xpoints = []
+    test_errs = []
+    train_errs = []
+
+    for t in range(20):
+        xpoints.append(t + 1)
         votes, classifiers = ada_boost(train_data, attributes, t + 1)
-        print_err_for_one_depth(train_data, test_data, votes, classifiers, t)
+        test_err, train_err = print_err_for_one_depth(train_data, test_data, votes, classifiers, t + 1)
+        test_errs.append(test_err)
+        train_errs.append(train_err)
+
+    xpoints = np.array(xpoints)
+
+    plt.title("Test and Train Error for AdaBoost")
+    plt.xlabel("T")
+    plt.ylabel("Error")
+
+    plt.plot(xpoints, np.array(test_errs), color='r', label='test')
+    plt.plot(xpoints, np.array(train_errs), color='b', label='train')
+    plt.legend()
+    plt.show()
 
 def ada_boost(train_data, attributes, T):
     weights = [1 / len(train_data)] * len(train_data) 
