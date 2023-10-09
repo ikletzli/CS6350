@@ -381,13 +381,17 @@ def evaluate_bank_tree():
     xpoints = []
     test_errs = []
     train_errs = []
+    individual_test_errs = []
+    individual_train_errs = []
 
-    for t in range(20):
+    for t in range(500):
         xpoints.append(t + 1)
-        votes, classifiers = ada_boost(train_data, attributes, t + 1)
+        votes, classifiers, train_errors, test_errors = ada_boost(train_data, test_data, attributes, t + 1)
         test_err, train_err = print_err_for_one_depth(train_data, test_data, votes, classifiers, t + 1)
         test_errs.append(test_err)
         train_errs.append(train_err)
+        individual_test_errs.append(test_errors)
+        individual_train_errs.append(train_errors)
 
     xpoints = np.array(xpoints)
 
@@ -400,7 +404,32 @@ def evaluate_bank_tree():
     plt.legend()
     plt.show()
 
-def ada_boost(train_data, attributes, T):
+    test_errs = []
+    train_errs = []
+
+    for i in range (500):
+        x = np.array([i + 1] * (i + 1))
+        test = np.array(individual_test_errs[i])
+        test_errs.append(np.sum(test) / (i + 1))
+
+        train = np.array(individual_train_errs[i])
+        train_errs.append(np.sum(train) / (i + 1))
+
+    plt.title("Average Errors for Each Set of Classifiers AdaBoost")
+    plt.xlabel("T")
+    plt.ylabel("Error")
+
+    plt.plot(xpoints, np.array(test_errs), color='r', label='test')
+    plt.plot(xpoints, np.array(train_errs), color='b', label='train')
+    plt.legend()
+    plt.show()
+
+def get_err_for_one_classifier(train_data, test_data, classifier):
+    train_err = percent_predicted_correct(classifier, train_data)
+    test_err = percent_predicted_correct(classifier, test_data)
+    return train_err, test_err
+
+def ada_boost(train_data, test_data, attributes, T):
     weights = [1 / len(train_data)] * len(train_data) 
 
     for i in range(len(train_data)):
@@ -408,9 +437,15 @@ def ada_boost(train_data, attributes, T):
     
     classifiers = [None] * T 
     votes = [None] * T 
+    train_errors = [0] * T
+    test_errors = [0] * T
     for t in range(T):
         tree = ID3(train_data, attributes, InformationGain(), 1)
         classifiers[t] = tree
+
+        train_err, test_err = get_err_for_one_classifier(train_data, test_data, tree)
+        train_errors[t] = train_err
+        test_errors[t] = test_err
 
         err_sum = 0
         counter = 0
@@ -437,7 +472,7 @@ def ada_boost(train_data, attributes, T):
         for i in range(len(train_data)):
             train_data[i]['weight'] = weights[i]
 
-    return votes, classifiers
+    return votes, classifiers, train_errors, test_errors
 
 def main():
     evaluate_bank_tree()
