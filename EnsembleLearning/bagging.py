@@ -1,6 +1,6 @@
 import os
 import math
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import random
 
@@ -394,6 +394,82 @@ def bagging_error(trees, examples):
 
     return 1 - (num_right / num_examples)
 
+def new_problem():
+    attributes = read_bank_description("bank/data-desc.txt")
+    attribute_names = list(attributes.keys())
+    train_data = read_examples("bank/train.csv", attribute_names)
+    test_data = read_examples("bank/test.csv", attribute_names)
+
+    for example in train_data:
+        example['weight'] = 1
+
+    for example in test_data:
+        example['weight'] = 1
+
+    numeric_to_categorical(train_data, test_data, attributes)
+
+    attributes.pop('label')
+
+    print("Evalutating bank data with 'unknown' as an attribute value:\n")
+
+    bagged_predictors = []
+    single_trees = []
+
+    for i in range(100):
+        trees = bag(train_data, attributes, num_trees=500, num_samples=1000)
+        bagged_predictors.append(trees)
+        print(f"Iteration {i + 1} of bagging")
+
+    for predictor in bagged_predictors:
+        single_trees.append(predictor[0])
+
+    single_tree_biases = []
+    single_tree_variances = []
+    bagged_biases = []
+    bagged_variances = []
+
+    for example in test_data:
+        # compute bias and variance for single trees
+        predictions = []
+        for tree in single_trees:
+            predictions.append(predict(tree, example))
+
+        predictions = np.array(predictions)
+        average = np.sum(predictions) / predictions.size
+        bias = (average - example['label']) ** 2
+        variance = (1 / (predictions.size - 1)) * np.sum((predictions-average)**2)
+        single_tree_biases.append(bias)
+        single_tree_variances.append(variance)
+
+        # compute bias and variance for bagged predictors
+        predictions = []
+        for bagged_predictor in bagged_predictors:
+            predictions.append(bagged_prediction(bagged_predictor, example))
+
+        predictions = np.array(predictions)
+        average = np.sum(predictions) / predictions.size
+        bias = (average - example['label']) ** 2
+        variance = (1 / (predictions.size - 1)) * np.sum((predictions-average)**2)
+        bagged_biases.append(bias)
+        bagged_variances.append(variance)
+
+    single_tree_biases = np.array(single_tree_biases)
+    single_tree_variances = np.array(single_tree_variances)
+    bagged_biases = np.array(bagged_biases)
+    bagged_variances = np.array(bagged_variances)
+
+    average_single_tree_bias = np.sum(single_tree_biases) / single_tree_biases.size
+    average_single_tree_variance = np.sum(single_tree_variances) / single_tree_variances.size
+    error_estimate_st = average_single_tree_bias + average_single_tree_variance
+
+    average_bagged_bias = np.sum(bagged_biases) / bagged_biases.size
+    average_bagged_variance = np.sum(bagged_variances) / bagged_variances.size
+    error_estimate_bag = average_bagged_bias + average_bagged_variance
+
+    print(f"Single Tree Estimates:\n Bias: {average_single_tree_bias:.4f}, Variance: {average_single_tree_variance:.4f}, Error: {error_estimate_st:.4f}")
+    print(f"Bagged Estimates:\n Bias: {average_bagged_bias:.4f}, Variance: {average_bagged_variance:.4f}, Error: {error_estimate_bag:.4f}")
+
+
 def evaluate_bank_tree():
     attributes = read_bank_description("bank/data-desc.txt")
     attribute_names = list(attributes.keys())
@@ -487,7 +563,8 @@ def ada_boost(train_data, test_data, attributes, T):
     return votes, classifiers, train_errors, test_errors
 
 def main():
-    evaluate_bank_tree()
+    #evaluate_bank_tree()
+    new_problem()
 
 if __name__ == "__main__":
     main()
