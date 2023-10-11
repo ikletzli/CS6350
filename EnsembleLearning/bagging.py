@@ -1,6 +1,6 @@
 import os
 import math
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import random
 
@@ -26,25 +26,6 @@ class InformationGain(Purity):
         entropy = sum([p * math.log(p) for p in probabilities])
         return -entropy
 
-class MajorityError(Purity):
-    def purity(self, label_counts, total_count):
-        best_count = 0
-
-        for label, count in label_counts.items():
-            if count > best_count:
-                best_count = count
-
-        return (total_count - best_count) / total_count
-    
-class GiniIndex(Purity):
-    def purity(self, label_counts, total_count):
-        probabilities = []
-        for label, count in label_counts.items():
-            probabilities.append(count / total_count)
-
-        sum_prob_square = sum([p * p for p in probabilities])
-        return 1.0 - sum_prob_square
-
 def get_label_counts(examples):
     label_counts = {}
 
@@ -61,8 +42,25 @@ def get_label_counts(examples):
     
     return label_counts
 
+def sample_attributes(attributes, num_to_split_on):
+    sample_attributes = []
+    if num_to_split_on >= len(attributes):
+        return attributes
+    
+    copy_of_attributes = []
+
+    for attribute in attributes:
+        copy_of_attributes.append(attribute)
+    
+    for i in range(num_to_split_on):
+        index = random.randint(0, len(copy_of_attributes) - 1)
+        sample_attributes.append(copy_of_attributes.pop(index))
+
+    return sample_attributes
+        
+
 # ID3 algorithm to return a decision tree
-def ID3(examples, attributes_and_vals, purity_measure, max_depth):
+def ID3(examples, attributes_and_vals, purity_measure, max_depth, num_to_split_on):
     attributes = list(attributes_and_vals.keys())
     dif_labels = False
 
@@ -103,11 +101,16 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth):
 
     total_purity = purity_measure.purity(label_counts, total_length)
 
+    subset_attributes = attributes
+
+    if num_to_split_on != None:
+        subset_attributes = sample_attributes(attributes, num_to_split_on)
+
     best_gain = 0
-    best_attribute = attributes[0]
+    best_attribute = subset_attributes[0]
 
     # find best attribute using the purity measure
-    for attribute in attributes:
+    for attribute in subset_attributes:
         attribute_vals = {}
 
         counter = 0
@@ -153,7 +156,6 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth):
 
     children_of_root = {}
 
-
     for attribute_val, new_examples in children.items():
         # set is empty, create a label using the majority label
         if (len(new_examples) == 0):
@@ -171,7 +173,7 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth):
             for attr, vals in attributes_and_vals.items():
                 if (attr != best_attribute):
                     new_attributes_and_vals[attr] = vals
-            children_of_root[attribute_val] = ID3(new_examples, new_attributes_and_vals, purity_measure, max_depth - 1)
+            children_of_root[attribute_val] = ID3(new_examples, new_attributes_and_vals, purity_measure, max_depth - 1, num_to_split_on)
 
     root_node.children = children_of_root
     return root_node
@@ -238,17 +240,6 @@ def predict(tree, example):
 
     return current_subtree.label
 
-# determines percent of correctly predicted labels
-def percent_predicted_correct(tree, examples):
-    num_examples = len(examples)
-    num_right = 0
-    for example in examples:
-        prediction = predict(tree, example)
-        if prediction == example["label"]:
-            num_right = num_right + 1
-
-    return 1 - (num_right / num_examples)
-
 # converts numeric data to categorical by comparing numeric values to median and 
 # determining if the value is bigger or smaller than the median
 def numeric_to_categorical(train_data, test_data, attributes):
@@ -278,79 +269,6 @@ def numeric_to_categorical(train_data, test_data, attributes):
             
             attributes[name] = ['bigger', 'smaller']
 
-# updates unknown values with the majority label for that attribute
-def update_unknown_values(train_data, test_data, attributes):
-    majority_values = {}
-
-    for name, vals in attributes.items():
-        if 'unknown' in vals:
-            vals.remove('unknown')
-
-    for name, vals in attributes.items():
-        majority_values[name] = {}
-        for val in vals:
-            majority_values[name][val] = 0
-
-    for example in train_data:
-        for name, val in example.items():
-            if name != 'label':
-                if val != 'unknown':
-                    majority_values[name][val] = majority_values[name][val] + 1
-
-    for attr, val_counts in majority_values.items():
-        best_count = 0
-        best_val = ""
-        for val, count in val_counts.items():
-            if count > best_count:
-                best_count = count
-                best_val = val
-        
-        majority_values[attr] = best_val
-
-    for example in train_data:
-        for attr, val in example.items():
-            if val == 'unknown':
-                example[attr] = majority_values[attr]
-
-    for example in test_data:
-        for attr, val in example.items():
-            if val == 'unknown':
-                example[attr] = majority_values[attr]
-
-def print_err(purity_measures, train_data, attributes, test_data, max_depth):
-    for purity_measure in purity_measures:
-        class_name = purity_measure.__class__.__name__
-        print(f"Purity: {class_name}")
-
-        average_test_err = 0
-        average_train_err = 0
-        for depth in range(max_depth):
-            tree = ID3(train_data, attributes, purity_measure, depth + 1)
-            test_err = percent_predicted_correct(tree, test_data)
-            train_err = percent_predicted_correct(tree, train_data)
-
-            average_test_err += test_err
-            average_train_err += train_err
-
-            class_name = purity_measure.__class__.__name__
-            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
-
-        print("")
-        print(f"Average Test Error: {(average_test_err/max_depth):.4f}, Average Train Error: {(average_train_err/max_depth):.4f}")
-        print("")
-
-def ada_prediction(votes, classifiers, example):
-    sum = 0
-    for i in range(len(classifiers)):
-        sum += votes[i] * predict(classifiers[i], example)
-
-    sign = example['label'] * sum
-
-    if sign > 0:
-        return 1
-    
-    return 0
-
 def bag(train_data, attributes, num_trees, num_samples):
     trees = []
     for iteration in range(num_trees):
@@ -359,7 +277,7 @@ def bag(train_data, attributes, num_trees, num_samples):
             index = random.randint(0, len(train_data) - 1)
             new_examples.append(train_data[index])
 
-        tree = ID3(new_examples, attributes, InformationGain(), -1)
+        tree = ID3(new_examples, attributes, InformationGain(), -1, None)
         trees.append(tree)
     
     return trees
@@ -416,7 +334,7 @@ def new_problem():
     single_trees = []
 
     for i in range(100):
-        trees = bag(train_data, attributes, num_trees=500, num_samples=1000)
+        trees = bag(train_data, attributes, num_trees=500, num_samples=1000, num_to_split_on=None)
         bagged_predictors.append(trees)
         print(f"Iteration {i + 1} of bagging")
 
@@ -494,7 +412,7 @@ def evaluate_bank_tree():
 
     for num_trees in range(500):
         xpoints.append(num_trees + 1)
-        trees = bag(train_data, attributes, num_trees=num_trees+1, num_samples=1000)
+        trees = bag(train_data, attributes, num_trees=num_trees+1, num_samples=1000, num_to_split_on=None)
         train_err = bagging_error(trees, train_data)
         train_errs.append(train_err)
         test_err = bagging_error(trees, test_data)
@@ -512,59 +430,60 @@ def evaluate_bank_tree():
     plt.legend()
     plt.show()
 
-def get_err_for_one_classifier(train_data, test_data, classifier):
-    train_err = percent_predicted_correct(classifier, train_data)
-    test_err = percent_predicted_correct(classifier, test_data)
-    return train_err, test_err
 
-def ada_boost(train_data, test_data, attributes, T):
-    weights = [1 / len(train_data)] * len(train_data) 
+def random_forest():
+    attributes = read_bank_description("bank/data-desc.txt")
+    attribute_names = list(attributes.keys())
+    train_data = read_examples("bank/train.csv", attribute_names)
+    test_data = read_examples("bank/test.csv", attribute_names)
 
-    for i in range(len(train_data)):
-        train_data[i]['weight'] = weights[i]
-    
-    classifiers = [None] * T 
-    votes = [None] * T 
-    train_errors = [0] * T
-    test_errors = [0] * T
-    for t in range(T):
-        tree = ID3(train_data, attributes, InformationGain(), 1)
-        classifiers[t] = tree
+    for example in train_data:
+        example['weight'] = 1
 
-        train_err, test_err = get_err_for_one_classifier(train_data, test_data, tree)
-        train_errors[t] = train_err
-        test_errors[t] = test_err
+    for example in test_data:
+        example['weight'] = 1
 
-        err_sum = 0
-        counter = 0
-        for example in train_data:
-            # updates for e_t
-            yi_hxi = example['label'] * predict(tree, example)
-            err_sum += weights[counter] * yi_hxi
-            counter += 1
-            
-        err_t = 0.5 - 0.5 * err_sum
-        votes[t] = 0.5 * math.log((1 - err_t) / err_t)
+    numeric_to_categorical(train_data, test_data, attributes)
 
-        weight_sum = 0
-        counter = 0
-        for example in train_data:
-            # updates for D_t+1
-            yi_hxi = example['label'] * predict(tree, example)
-            weights[counter] *= math.exp(-votes[t] * yi_hxi)
-            weight_sum += weights[counter]
-            counter += 1
+    attributes.pop('label')
 
-        weights = [x / weight_sum for x in weights]
+    print("Evalutating bank data with 'unknown' as an attribute value:\n")
 
-        for i in range(len(train_data)):
-            train_data[i]['weight'] = weights[i]
+    xpoints = []
+    test_errs = {2:[],4:[],6:[]}
+    train_errs = {2:[],4:[],6:[]}
 
-    return votes, classifiers, train_errors, test_errors
+    for num_trees in range(500):
+        xpoints.append(num_trees + 1)
+        for split in [2,4,6]:
+            trees = bag(train_data, attributes, num_trees=num_trees+1, num_samples=1000, num_to_split_on=split)
+            train_err = bagging_error(trees, train_data)
+            train_errs[split].append(train_err)
+            test_err = bagging_error(trees, test_data)
+            test_errs[split].append(test_err)
+            print(f"Number of Trees: {num_trees}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}, Random Forest Split: {split}")
+
+    xpoints = np.array(xpoints)
+
+    plt.title("Test and Train Error for Random Forests")
+    plt.xlabel("Number of Trees")
+    plt.ylabel("Error")
+
+    plt.plot(xpoints, np.array(test_errs[2]), label='test, split=2')
+    plt.plot(xpoints, np.array(train_errs[2]), label='train, split=2')
+
+    plt.plot(xpoints, np.array(test_errs[4]), label='test, split=4')
+    plt.plot(xpoints, np.array(train_errs[4]), label='train, split=4')
+
+    plt.plot(xpoints, np.array(test_errs[6]), label='test, split=6')
+    plt.plot(xpoints, np.array(train_errs[6]), label='train, split=6')
+    plt.legend()
+    plt.show()
 
 def main():
     #evaluate_bank_tree()
-    new_problem()
+    #new_problem()
+    random_forest()
 
 if __name__ == "__main__":
     main()
