@@ -1,4 +1,5 @@
 import os
+import sys
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,25 +25,6 @@ class InformationGain(Purity):
 
         entropy = sum([p * math.log(p) for p in probabilities])
         return -entropy
-
-class MajorityError(Purity):
-    def purity(self, label_counts, total_count):
-        best_count = 0
-
-        for label, count in label_counts.items():
-            if count > best_count:
-                best_count = count
-
-        return (total_count - best_count) / total_count
-    
-class GiniIndex(Purity):
-    def purity(self, label_counts, total_count):
-        probabilities = []
-        for label, count in label_counts.items():
-            probabilities.append(count / total_count)
-
-        sum_prob_square = sum([p * p for p in probabilities])
-        return 1.0 - sum_prob_square
 
 def get_label_counts(examples):
     label_counts = {}
@@ -277,67 +259,6 @@ def numeric_to_categorical(train_data, test_data, attributes):
             
             attributes[name] = ['bigger', 'smaller']
 
-# updates unknown values with the majority label for that attribute
-def update_unknown_values(train_data, test_data, attributes):
-    majority_values = {}
-
-    for name, vals in attributes.items():
-        if 'unknown' in vals:
-            vals.remove('unknown')
-
-    for name, vals in attributes.items():
-        majority_values[name] = {}
-        for val in vals:
-            majority_values[name][val] = 0
-
-    for example in train_data:
-        for name, val in example.items():
-            if name != 'label':
-                if val != 'unknown':
-                    majority_values[name][val] = majority_values[name][val] + 1
-
-    for attr, val_counts in majority_values.items():
-        best_count = 0
-        best_val = ""
-        for val, count in val_counts.items():
-            if count > best_count:
-                best_count = count
-                best_val = val
-        
-        majority_values[attr] = best_val
-
-    for example in train_data:
-        for attr, val in example.items():
-            if val == 'unknown':
-                example[attr] = majority_values[attr]
-
-    for example in test_data:
-        for attr, val in example.items():
-            if val == 'unknown':
-                example[attr] = majority_values[attr]
-
-def print_err(purity_measures, train_data, attributes, test_data, max_depth):
-    for purity_measure in purity_measures:
-        class_name = purity_measure.__class__.__name__
-        print(f"Purity: {class_name}")
-
-        average_test_err = 0
-        average_train_err = 0
-        for depth in range(max_depth):
-            tree = ID3(train_data, attributes, purity_measure, depth + 1)
-            test_err = percent_predicted_correct(tree, test_data)
-            train_err = percent_predicted_correct(tree, train_data)
-
-            average_test_err += test_err
-            average_train_err += train_err
-
-            class_name = purity_measure.__class__.__name__
-            print(f"Depth: {depth + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
-
-        print("")
-        print(f"Average Test Error: {(average_test_err/max_depth):.4f}, Average Train Error: {(average_train_err/max_depth):.4f}")
-        print("")
-
 def ada_prediction(votes, classifiers, example):
     sum = 0
     for i in range(len(classifiers)):
@@ -376,7 +297,6 @@ def evaluate_bank_tree():
 
     attributes.pop('label')
 
-    print("Evalutating bank data with 'unknown' as an attribute value:\n")
 
     xpoints = []
     test_errs = []
@@ -384,7 +304,14 @@ def evaluate_bank_tree():
     individual_test_errs = []
     individual_train_errs = []
 
-    for t in range(500):
+    num_iterations = 20
+
+    if (len(sys.argv) > 1):
+        num_iterations = int(sys.argv[1])
+
+    print(f"Evalutating AdaBoost for {num_iterations} iterations:\n")
+
+    for t in range(num_iterations):
         xpoints.append(t + 1)
         votes, classifiers, train_errors, test_errors = ada_boost(train_data, test_data, attributes, t + 1)
         test_err, train_err = print_err_for_one_depth(train_data, test_data, votes, classifiers, t + 1)
@@ -407,7 +334,7 @@ def evaluate_bank_tree():
     test_errs = []
     train_errs = []
 
-    for i in range (500):
+    for i in range (num_iterations):
         x = np.array([i + 1] * (i + 1))
         test = np.array(individual_test_errs[i])
         test_errs.append(np.sum(test) / (i + 1))
