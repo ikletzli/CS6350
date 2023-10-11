@@ -269,7 +269,7 @@ def numeric_to_categorical(train_data, test_data, attributes):
             
             attributes[name] = ['bigger', 'smaller']
 
-def bag(train_data, attributes, num_trees, num_samples):
+def bag(train_data, attributes, num_trees, num_samples, num_to_split_on):
     trees = []
     for iteration in range(num_trees):
         new_examples = []
@@ -277,7 +277,7 @@ def bag(train_data, attributes, num_trees, num_samples):
             index = random.randint(0, len(train_data) - 1)
             new_examples.append(train_data[index])
 
-        tree = ID3(new_examples, attributes, InformationGain(), -1, None)
+        tree = ID3(new_examples, attributes, InformationGain(), -1, num_to_split_on)
         trees.append(tree)
     
     return trees
@@ -453,7 +453,7 @@ def random_forest():
     test_errs = {2:[],4:[],6:[]}
     train_errs = {2:[],4:[],6:[]}
 
-    for num_trees in range(500):
+    for num_trees in range(20):
         xpoints.append(num_trees + 1)
         for split in [2,4,6]:
             trees = bag(train_data, attributes, num_trees=num_trees+1, num_samples=1000, num_to_split_on=split)
