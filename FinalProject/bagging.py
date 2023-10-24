@@ -4,6 +4,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+import csv
 
 class Node:
     def __init__(self, children, attribute, label):
@@ -179,56 +180,89 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth, num_to_split_o
     root_node.children = children_of_root
     return root_node
 
+# updates unknown values with the majority label for that attribute
+def update_unknown_values(train_data, test_data, attributes):
+    majority_values = {}
+
+    for name, vals in attributes.items():
+        majority_values[name] = {}
+        for val in vals:
+            majority_values[name][val] = 0
+
+    for example in train_data:
+        for name, val in example.items():
+            if name != 'label':
+                if val != '?':
+                    majority_values[name][val] = majority_values[name][val] + 1
+
+    for attr, val_counts in majority_values.items():
+        best_count = 0
+        best_val = ""
+        for val, count in val_counts.items():
+            if count > best_count:
+                best_count = count
+                best_val = val
+        
+        majority_values[attr] = best_val
+
+    for example in train_data:
+        for attr, val in example.items():
+            if val == '?':
+                example[attr] = majority_values[attr]
+
+    for example in test_data:
+        for attr, val in example.items():
+            if val == '?':
+                example[attr] = majority_values[attr]
+
 # converts the examples into a list of maps that map an example's attributes to its values
 def read_examples(file_name, attributes):
+    is_test = "test" in file_name
     script_directory = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_directory, file_name)
     examples = []
 
     with open (file_path, 'r') as f:
+        f.readline()
         for line in f:
             values = line.strip().split(',')
             example = {}
             for i in range(len(attributes)):
                 if attributes[i] == 'label':
-                    if values[i] == 'no':
+                    if is_test or values[i] == '0':
                         example[attributes[i]] = -1
                     else:
                         example[attributes[i]] = 1
 
                 else:
-                    example[attributes[i]] = values[i]
+                    if is_test:
+                        example[attributes[i]] = values[i+1]
+                    else:
+                        example[attributes[i]] = values[i]
 
             examples.append(example)
     
     return examples
 
-# reads the attributes for the bank data
-def read_bank_description(file_name):
+# reads the attributes for the income data
+def read_attributes():
     script_directory = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(script_directory, file_name)
+    file_path = os.path.join(script_directory, "income2023f/description.txt")
 
     attributes = {}
 
     with open (file_path, 'r') as f:
         for line in f:
-            if "-" in line:
-                index = line.index("-")
-                line = line[index+2:]
+            values = line.strip().split(': ')
+            values[0] = values[0].strip()
 
-                values = line.strip().split(':')
-                values[0] = values[0].strip()
-
-                if "numeric" in line:
-                    attr_vals = values[1]
-                    attributes[values[0]] = ['numeric']
-                else:
-                    attr_vals = values[2]
-                    index_of_quote = attr_vals.index('"')
-                    attr_vals = attr_vals[index_of_quote:len(attr_vals) - 1]
-                    attr_vals = attr_vals.replace('"', '')
-                    attr_vals = attr_vals.split(',')
-                    attributes[values[0]] = attr_vals
+            if "continuous" in line:
+                attr_vals = values[1]
+                attributes[values[0]] = ['numeric']
+            else:
+                attr_vals = values[1][1:-1]
+                attr_vals = attr_vals.split(", ")
+                attributes[values[0]] = attr_vals
     
     return attributes
 
@@ -283,8 +317,67 @@ def bag(train_data, attributes, num_trees, num_samples, num_to_split_on):
     
     return trees
 
-def train_via_decision_tree(train_data, attributes):
+def train_via_decision_tree():
+    attributes = read_attributes()
+    attribute_names = list(attributes.keys())
+    train_data = read_examples("income2023f/train_final.csv", attribute_names)
+    test_data = read_examples("income2023f/test_final.csv", attribute_names)
+    #test_data = []
+
+
+    numeric_to_categorical(train_data, test_data, attributes)
+
+    attributes.pop('label')
+
+    update_unknown_values(train_data, test_data, attributes)
+
+    for example in train_data:
+        example['weight'] = 1
+
+    for example in test_data:
+        example['weight'] = 1
+    
     tree = ID3(train_data, attributes, InformationGain(), -1, len(attributes))
+
+    id = 1
+    for example in test_data:
+        label = predict(tree, example)
+        print(label)
+
+    with open('decision_tree.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["ID", "Prediction"])
+        id = 1
+        for example in test_data:
+            label = predict(tree, example)
+            writer.writerow([id, label])
+            id += 1
+
+    
+    # xpoints = []
+    # test_errs = []
+    # train_errs = []
+
+    # for num_trees in range(num_iterations):
+    #     xpoints.append(num_trees + 1)
+    #     trees = bag(train_data, attributes, num_trees=num_trees+1, num_samples=1000, num_to_split_on=None)
+    #     train_err = bagging_error(trees, train_data)
+    #     train_errs.append(train_err)
+    #     test_err = bagging_error(trees, test_data)
+    #     test_errs.append(test_err)
+    #     print(f"Number of Trees: {num_trees + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
+
+    # xpoints = np.array(xpoints)
+
+
+    # plt.title("Test and Train Error for Bagging")
+    # plt.xlabel("Number of Trees")
+    # plt.ylabel("Error")
+
+    # plt.plot(xpoints, np.array(test_errs), color='r', label='test')
+    # plt.plot(xpoints, np.array(train_errs), color='b', label='train')
+    # plt.legend()
+    # plt.show()
 
 def bagged_prediction(trees, example):
     prediction_counts = {}
@@ -568,25 +661,26 @@ def evaluate_random_forest(num_iterations):
     plt.show()
 
 def main():
-    num_trees = 20
-    num_iterations = 2
+    # num_trees = 20
+    # num_iterations = 2
 
-    if (len(sys.argv) > 1):
-        num_trees = int(sys.argv[1])
+    # if (len(sys.argv) > 1):
+    #     num_trees = int(sys.argv[1])
 
-    if (len(sys.argv) > 2):
-        num_iterations = int(sys.argv[2])
+    # if (len(sys.argv) > 2):
+    #     num_iterations = int(sys.argv[2])
 
-    evaluate_bagging(num_trees)
-    print()
+    # evaluate_bagging(num_trees)
+    # print()
 
-    bias_variance_for_bagging(num_iterations)
-    print()
+    # bias_variance_for_bagging(num_iterations)
+    # print()
     
-    evaluate_random_forest(num_trees)
-    print()
+    # evaluate_random_forest(num_trees)
+    # print()
     
-    bias_variance_for_random_forest(num_iterations)
+    # bias_variance_for_random_forest(num_iterations)
+    train_via_decision_tree()
 
 if __name__ == "__main__":
     main()
