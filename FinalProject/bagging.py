@@ -322,8 +322,6 @@ def train_via_decision_tree():
     attribute_names = list(attributes.keys())
     train_data = read_examples("income2023f/train_final.csv", attribute_names)
     test_data = read_examples("income2023f/test_final.csv", attribute_names)
-    #test_data = []
-
 
     numeric_to_categorical(train_data, test_data, attributes)
 
@@ -340,10 +338,6 @@ def train_via_decision_tree():
     tree = ID3(train_data, attributes, InformationGain(), -1, len(attributes))
 
     id = 1
-    for example in test_data:
-        label = predict(tree, example)
-        print(label)
-
     with open('decision_tree.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["ID", "Prediction"])
@@ -352,32 +346,6 @@ def train_via_decision_tree():
             label = predict(tree, example)
             writer.writerow([id, label])
             id += 1
-
-    
-    # xpoints = []
-    # test_errs = []
-    # train_errs = []
-
-    # for num_trees in range(num_iterations):
-    #     xpoints.append(num_trees + 1)
-    #     trees = bag(train_data, attributes, num_trees=num_trees+1, num_samples=1000, num_to_split_on=None)
-    #     train_err = bagging_error(trees, train_data)
-    #     train_errs.append(train_err)
-    #     test_err = bagging_error(trees, test_data)
-    #     test_errs.append(test_err)
-    #     print(f"Number of Trees: {num_trees + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
-
-    # xpoints = np.array(xpoints)
-
-
-    # plt.title("Test and Train Error for Bagging")
-    # plt.xlabel("Number of Trees")
-    # plt.ylabel("Error")
-
-    # plt.plot(xpoints, np.array(test_errs), color='r', label='test')
-    # plt.plot(xpoints, np.array(train_errs), color='b', label='train')
-    # plt.legend()
-    # plt.show()
 
 def bagged_prediction(trees, example):
     prediction_counts = {}
@@ -409,207 +377,35 @@ def bagging_error(trees, examples):
 
     return 1 - (num_right / num_examples)
 
-def bias_variance_for_bagging(num_iterations):
-    attributes = read_bank_description("bank/data-desc.txt")
+def train_via_bagging():
+    attributes = read_attributes()
     attribute_names = list(attributes.keys())
-    train_data = read_examples("bank/train.csv", attribute_names)
-    test_data = read_examples("bank/test.csv", attribute_names)
+    train_data = read_examples("income2023f/train_final.csv", attribute_names)
+    test_data = read_examples("income2023f/test_final.csv", attribute_names)
+
+    numeric_to_categorical(train_data, test_data, attributes)
+
+    attributes.pop('label')
+
+    update_unknown_values(train_data, test_data, attributes)
 
     for example in train_data:
         example['weight'] = 1
 
     for example in test_data:
         example['weight'] = 1
+    
+    trees = bag(train_data, attributes, num_trees=500, num_samples=1000, num_to_split_on=None)
 
-    numeric_to_categorical(train_data, test_data, attributes)
-
-    attributes.pop('label')
-
-    print(f"Calculating Bias and Variance for Bagging using {num_iterations} iterations:\n")
-
-    bagged_predictors = []
-    single_trees = []
-
-    for i in range(num_iterations):
-        trees = bag(train_data, attributes, num_trees=500, num_samples=1000, num_to_split_on=None)
-        bagged_predictors.append(trees)
-        print(f"Iteration {i + 1} of bagging")
-
-    for predictor in bagged_predictors:
-        single_trees.append(predictor[0])
-
-    single_tree_biases = []
-    single_tree_variances = []
-    bagged_biases = []
-    bagged_variances = []
-
-    for example in test_data:
-        # compute bias and variance for single trees
-        predictions = []
-        for tree in single_trees:
-            predictions.append(predict(tree, example))
-
-        predictions = np.array(predictions)
-        average = np.sum(predictions) / predictions.size
-        bias = (average - example['label']) ** 2
-        variance = (1 / (predictions.size - 1)) * np.sum((predictions-average)**2)
-        single_tree_biases.append(bias)
-        single_tree_variances.append(variance)
-
-        # compute bias and variance for bagged predictors
-        predictions = []
-        for bagged_predictor in bagged_predictors:
-            predictions.append(bagged_prediction(bagged_predictor, example))
-
-        predictions = np.array(predictions)
-        average = np.sum(predictions) / predictions.size
-        bias = (average - example['label']) ** 2
-        variance = (1 / (predictions.size - 1)) * np.sum((predictions-average)**2)
-        bagged_biases.append(bias)
-        bagged_variances.append(variance)
-
-    single_tree_biases = np.array(single_tree_biases)
-    single_tree_variances = np.array(single_tree_variances)
-    bagged_biases = np.array(bagged_biases)
-    bagged_variances = np.array(bagged_variances)
-
-    average_single_tree_bias = np.sum(single_tree_biases) / single_tree_biases.size
-    average_single_tree_variance = np.sum(single_tree_variances) / single_tree_variances.size
-    error_estimate_st = average_single_tree_bias + average_single_tree_variance
-
-    average_bagged_bias = np.sum(bagged_biases) / bagged_biases.size
-    average_bagged_variance = np.sum(bagged_variances) / bagged_variances.size
-    error_estimate_bag = average_bagged_bias + average_bagged_variance
-
-    print(f"Single Tree Estimates:\n Bias: {average_single_tree_bias:.4f}, Variance: {average_single_tree_variance:.4f}, Error: {error_estimate_st:.4f}")
-    print(f"Bagged Estimates:\n Bias: {average_bagged_bias:.4f}, Variance: {average_bagged_variance:.4f}, Error: {error_estimate_bag:.4f}")
-
-def bias_variance_for_random_forest(num_iterations):
-    attributes = read_bank_description("bank/data-desc.txt")
-    attribute_names = list(attributes.keys())
-    train_data = read_examples("bank/train.csv", attribute_names)
-    test_data = read_examples("bank/test.csv", attribute_names)
-
-    for example in train_data:
-        example['weight'] = 1
-
-    for example in test_data:
-        example['weight'] = 1
-
-    numeric_to_categorical(train_data, test_data, attributes)
-
-    print(f"Calculating Bias and Variance for Random Forest using {num_iterations} iterations:\n")
-
-    attributes.pop('label')
-
-    all_bagged_predictors = {2:[], 4:[], 6:[]}
-    single_trees = {2:[], 4:[], 6:[]}
-
-    for i in range(num_iterations):
-        for split in [2,4,6]:
-            trees = bag(train_data, attributes, num_trees=500, num_samples=1000, num_to_split_on=split)
-            all_bagged_predictors[split].append(trees)
-        
-        print(f"Iteration {i + 1} of bagging")
-
-    print()
-    for split, bagged_predictors in all_bagged_predictors.items():
-        for predictor in bagged_predictors:
-            single_trees[split].append(predictor[0])
-
-    single_tree_biases = {2:[], 4:[], 6:[]}
-    single_tree_variances = {2:[], 4:[], 6:[]}
-    bagged_biases = {2:[], 4:[], 6:[]}
-    bagged_variances = {2:[], 4:[], 6:[]}
-
-    for example in test_data:
-        # compute bias and variance for single trees
-        all_predictions = {2:[], 4:[], 6:[]}
-        for split, trees in single_trees.items():
-            for tree in trees:
-                all_predictions[split].append(predict(tree, example))
-
-        for split, predictions in all_predictions.items():
-            predictions = np.array(predictions)
-            average = np.sum(predictions) / predictions.size
-            bias = (average - example['label']) ** 2
-            variance = (1 / (predictions.size - 1)) * np.sum((predictions-average)**2)
-            single_tree_biases[split].append(bias)
-            single_tree_variances[split].append(variance)
-
-        # compute bias and variance for bagged predictors
-        all_predictions = {2:[], 4:[], 6:[]}
-        for split, bagged_predictors in all_bagged_predictors.items():
-            for predictor in bagged_predictors:
-                all_predictions[split].append(bagged_prediction(predictor, example))
-
-        for split, predictions in all_predictions.items():
-            predictions = np.array(predictions)
-            average = np.sum(predictions) / predictions.size
-            bias = (average - example['label']) ** 2
-            variance = (1 / (predictions.size - 1)) * np.sum((predictions-average)**2)
-            bagged_biases[split].append(bias)
-            bagged_variances[split].append(variance)
-
-    for split in [2,4,6]:
-        st_bias = np.array(single_tree_biases[split])
-        st_variance = np.array(single_tree_variances[split])
-        bag_bias = np.array(bagged_biases[split])
-        bag_variance = np.array(bagged_variances[split])
-
-        est_st_bias = np.sum(st_bias) / st_bias.size
-        est_st_variance = np.sum(st_variance) / st_variance.size
-        est_st_err = est_st_bias + est_st_variance
-
-        est_bag_bias = np.sum(bag_bias) / bag_bias.size
-        est_bag_variance = np.sum(bag_variance) / bag_variance.size
-        est_bag_err = est_bag_bias + est_bag_variance
-
-        print(f"Single Tree Estimates for split={split}:\n Bias: {est_st_bias:.4f}, Variance: {est_st_variance:.4f}, Error: {est_st_err:.4f}")
-        print(f"Bagged Estimates for split={split}:\n Bias: {est_bag_bias:.4f}, Variance: {est_bag_variance:.4f}, Error: {est_bag_err:.4f}\n")
-
-def evaluate_bagging(num_iterations):
-    attributes = read_bank_description("bank/data-desc.txt")
-    attribute_names = list(attributes.keys())
-    train_data = read_examples("bank/train.csv", attribute_names)
-    test_data = read_examples("bank/test.csv", attribute_names)
-
-    for example in train_data:
-        example['weight'] = 1
-
-    for example in test_data:
-        example['weight'] = 1
-
-    numeric_to_categorical(train_data, test_data, attributes)
-
-    attributes.pop('label')
-
-    print(f"Evaluating Bagging using {num_iterations} trees:\n")
-
-    xpoints = []
-    test_errs = []
-    train_errs = []
-
-    for num_trees in range(num_iterations):
-        xpoints.append(num_trees + 1)
-        trees = bag(train_data, attributes, num_trees=num_trees+1, num_samples=1000, num_to_split_on=None)
-        train_err = bagging_error(trees, train_data)
-        train_errs.append(train_err)
-        test_err = bagging_error(trees, test_data)
-        test_errs.append(test_err)
-        print(f"Number of Trees: {num_trees + 1}, Test Error: {test_err:.4f}, Train Error: {train_err:.4f}")
-
-    xpoints = np.array(xpoints)
-
-    plt.title("Test and Train Error for Bagging")
-    plt.xlabel("Number of Trees")
-    plt.ylabel("Error")
-
-    plt.plot(xpoints, np.array(test_errs), color='r', label='test')
-    plt.plot(xpoints, np.array(train_errs), color='b', label='train')
-    plt.legend()
-    plt.show()
-
+    id = 1
+    with open('bagged_submission.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["ID", "Prediction"])
+        id = 1
+        for example in test_data:
+            label = bagged_prediction(trees, example)
+            writer.writerow([id, label])
+            id += 1
 
 def evaluate_random_forest(num_iterations):
     attributes = read_bank_description("bank/data-desc.txt")
@@ -661,26 +457,8 @@ def evaluate_random_forest(num_iterations):
     plt.show()
 
 def main():
-    # num_trees = 20
-    # num_iterations = 2
-
-    # if (len(sys.argv) > 1):
-    #     num_trees = int(sys.argv[1])
-
-    # if (len(sys.argv) > 2):
-    #     num_iterations = int(sys.argv[2])
-
-    # evaluate_bagging(num_trees)
-    # print()
-
-    # bias_variance_for_bagging(num_iterations)
-    # print()
-    
-    # evaluate_random_forest(num_trees)
-    # print()
-    
-    # bias_variance_for_random_forest(num_iterations)
-    train_via_decision_tree()
+    #train_via_decision_tree()
+    train_via_bagging()
 
 if __name__ == "__main__":
     main()
