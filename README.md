@@ -14,3 +14,5 @@ To run the bagging file, start in the top level directory and run: python3 ./Ens
 To run the boosting file, start in the top level directory and run: python3 ./EnsembleLearning/boosting.py [num_iterations] where num_iterations is the number of iterations to run AdaBoost for. The default value for num_iterations is 20.
 
 To run the linear regression file, start in the top level directory and run: python3 ./LinearRegression/linear_regression.py.
+
+To run perceptron for HW3, start in the top level directory and run: python3 ./Perceptron/perceptron.py.

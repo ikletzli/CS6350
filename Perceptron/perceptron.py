@@ -54,7 +54,7 @@ def voted_perceptron(x, y, r, num_epochs):
             else:
                 return_vals[m] = (return_vals[m][0], return_vals[m][1] + 1)
 
-    return return_vals
+    return return_vals[1:]
 
 def average_perceptron(x, y, r, num_epochs):
     w = np.zeros_like(x[0])
@@ -80,8 +80,8 @@ def perceptron_prediction(x, y, w):
 
 def voted_perceptron_prediction(x, y, return_vals):
     prediction_sum = np.zeros((len(x)))
-    for vals in return_vals:
-        predictions = sign(x.dot(vals[0])) * vals[1]
+    for weight, count in return_vals:
+        predictions = sign(x.dot(weight)) * count
         prediction_sum += predictions
 
     prediction_sum = sign(prediction_sum)
@@ -118,26 +118,21 @@ def evaluate_perceptron():
 
     w = vanilla_perceptron(x_train,y_train,r=0.1,num_epochs=10)
     vanilla_err = perceptron_prediction(x_test, y_test, w)
+    print(f"Weight vector for vanilla perceptron: \n\t{w}")
+    print(f"Prediction error on test set for vanilla perceptron: \n\t{vanilla_err}\n")
 
     return_vals = voted_perceptron(x_train,y_train,r=0.1,num_epochs=10)
     voted_err = voted_perceptron_prediction(x_test, y_test, return_vals)
+    print(f"Weight vectors and counts for voted perceptron:")
+    for weight, count in return_vals:
+        print(f"\tWeight: {weight} Count: {count}")
+
+    print(f"Prediction error on test set for voted perceptron: \n\t{voted_err}\n")
 
     a = average_perceptron(x_train,y_train,r=0.1,num_epochs=10)
     average_err = perceptron_prediction(x_test, y_test, a)
-
-    plt.title("Cost for stochastic gradient descent")
-    plt.xlabel("Iterations")
-    plt.ylabel("Cost")
-
-    plt.plot(np.array(range(len(s_costs))), np.array(s_costs), color='b')
-    plt.show()
-
-    plt.title("Cost for batch gradient descent")
-    plt.xlabel("Iterations")
-    plt.ylabel("Cost")
-
-    plt.plot(np.array(range(len(b_costs))), np.array(b_costs), color='b')
-    plt.show()
+    print(f"Weight vector for average perceptron: \n\t{a}")
+    print(f"Prediction error on test set for average perceptron: \n\t{average_err}")
 
 def main():
     evaluate_perceptron()
