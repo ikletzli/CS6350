@@ -4,6 +4,7 @@ import math
 #import matplotlib.pyplot as plt
 import numpy as np
 import random
+from scipy.optimize import minimize
 
 # converts the examples into a list of maps that map an example's attributes to its values
 def read_examples(file_name):
@@ -108,6 +109,11 @@ def svm_gradient_descent(x, num_epochs, C, l0, a):
             else:
                 w = w - gamma_t * grad_w
 
+        #print(1-x[:,5]*x[:,0:5].dot(w))
+        #print(np.sum(np.fmax(0, 1-x[:,5]*x[:,0:5].dot(w))))
+        #print(x[:,0:5].shape)
+        #print(x[:,5].shape)
+        #print("Iteration:", T+1, 0.5 * w.dot(w) + C * np.sum(np.fmax(0, 1-x[:,5]*x[:,0:5].dot(w))))
         gamma_t = schedule(l0, T+1, a)
 
     return w
@@ -134,13 +140,18 @@ def evaluate_perceptron():
         x_test[1:, counter] = example
         counter += 1
 
+    l0 = [5e-5, 3e-6]
+    a = [5e-5, 6e-3]
+
     x_test = x_test.T
     for i in range(2):
-        l0 = 0.1
-        a = 0.2
-
         for C in [100/873, 500/873, 700/873]:
-            w = svm_gradient_descent(x_train,r=0.1,num_epochs=10, C=C, l0=l0, a=a)
+            w = svm_gradient_descent(x_train,num_epochs=100, C=C, l0=l0[i], a=a[i])
+            test_err = perceptron_prediction(x_test[:,0:5], x_test[:,5], w)
+            train_err = perceptron_prediction(x_train[:,0:5], x_train[:,5], w)
+
+            print("Test Error:", test_err, "Train Error:", train_err)
+
 
     # w = vanilla_perceptron(x_train,r=0.1,num_epochs=10)
     # vanilla_err = perceptron_prediction(x_test, y_test, w)
