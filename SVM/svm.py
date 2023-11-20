@@ -92,6 +92,39 @@ def voted_perceptron_prediction(x, y, return_vals):
 def schedule(l0, t, a):
     return l0 / (1 + (l0/a) * t)
 
+def svm_dual_form(train, C):
+    x = train[:,1:5]
+    y = train[:,5]
+    x_x_y_y = np.outer(y, y) * x.dot(x.T)
+    fun = lambda a: 0.5 * np.sum(np.outer(a, a) * x_x_y_y) - np.sum(a)
+
+    bnds = []
+    guess = []
+
+    for i in range(x.shape[0]):
+        bnds.append((0,C))
+        guess.append(0)
+
+    cons = ({'type': 'eq', 'fun': lambda a: a.dot(y)})
+
+    res = minimize(fun, guess, method='SLSQP', bounds=bnds, constraints=cons)
+
+    w_star = x.T.dot(res.x * y)
+
+    count = 0
+    b_star = 0
+    for i in range(x.shape[0]):
+        if (res.x[i] > 0 and res.x[i] < C):
+            count = count + 1
+            b_star = b_star + y[i] - w_star.dot(x[i])
+
+    b_star = b_star / count
+
+    augmented = np.zeros((5,))
+    augmented[0] = b_star
+    augmented[1:5] = w_star
+    return augmented
+
 def svm_gradient_descent(x, num_epochs, C, l0, a):
     w = np.zeros((5,))
     
@@ -144,14 +177,20 @@ def evaluate_perceptron():
     a = [5e-5, 6e-3]
 
     x_test = x_test.T
-    for i in range(2):
-        for C in [100/873, 500/873, 700/873]:
-            w = svm_gradient_descent(x_train,num_epochs=100, C=C, l0=l0[i], a=a[i])
-            test_err = perceptron_prediction(x_test[:,0:5], x_test[:,5], w)
-            train_err = perceptron_prediction(x_train[:,0:5], x_train[:,5], w)
+    # for i in range(2):
+    #     for C in [100/873, 500/873, 700/873]:
+    #         w = svm_gradient_descent(x_train,num_epochs=100, C=C, l0=l0[i], a=a[i])
+    #         test_err = perceptron_prediction(x_test[:,0:5], x_test[:,5], w)
+    #         train_err = perceptron_prediction(x_train[:,0:5], x_train[:,5], w)
 
-            print("Test Error:", test_err, "Train Error:", train_err)
+    #         print("Test Error:", test_err, "Train Error:", train_err)
 
+
+    for C in [100/873, 500/873, 700/873]:
+        w = svm_dual_form(x_train, C=C)
+        test_err = perceptron_prediction(x_test[:,0:5], x_test[:,5], w)
+        train_err = perceptron_prediction(x_train[:,0:5], x_train[:,5], w)
+        print("Test Error:", test_err, "Train Error:", train_err)
 
     # w = vanilla_perceptron(x_train,r=0.1,num_epochs=10)
     # vanilla_err = perceptron_prediction(x_test, y_test, w)
