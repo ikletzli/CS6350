@@ -28,48 +28,6 @@ def read_examples(file_name):
     
     return examples
 
-def vanilla_perceptron(x, y, r, num_epochs):
-    w = np.zeros_like(x[0])
-
-    for T in range(num_epochs):
-        for i in range(len(x)):
-            mistake = (y[i] * w.dot(x[i])) <= 0
-
-            if mistake:
-                w += r * y[i] * x[i]
-
-    return w
-
-def voted_perceptron(x, y, r, num_epochs):
-    w = np.zeros_like(x[0])
-    m = 0
-
-    return_vals = [(w,m)]
-
-    for T in range(num_epochs):
-        for i in range(len(x)):
-            mistake = (y[i] * return_vals[m][0].dot(x[i])) <= 0
-            if mistake:
-                return_vals.append((return_vals[m][0] + r*y[i]*x[i], 1))
-                m += 1
-            else:
-                return_vals[m] = (return_vals[m][0], return_vals[m][1] + 1)
-
-    return return_vals[1:]
-
-def average_perceptron(x, y, r, num_epochs):
-    w = np.zeros_like(x[0])
-    a = np.zeros_like(x[0])
-
-    for T in range(num_epochs):
-        for i in range(len(x)):
-            mistake = (y[i] * w.dot(x[i])) <= 0
-            if mistake:
-                w += r * y[i] * x[i]
-            a += w
-
-    return a
-
 def sign(vec):
     signed = np.vectorize(lambda val: -1 if val < 0 else 1)(vec)
     return signed
@@ -98,16 +56,6 @@ def svm_kernel_prediction(x, y, gamma, a_star, C):
 
     predictions = sign(w_star_x + b_star)
     err = 1 - (np.sum(predictions == y) / len(y))
-    return err
-
-def voted_perceptron_prediction(x, y, return_vals):
-    prediction_sum = np.zeros((len(x)))
-    for weight, count in return_vals:
-        predictions = sign(x.dot(weight)) * count
-        prediction_sum += predictions
-
-    prediction_sum = sign(prediction_sum)
-    err = 1 - (np.sum(prediction_sum == y) / len(y))
     return err
 
 def schedule(l0, t, a):
@@ -206,16 +154,11 @@ def svm_gradient_descent(x, num_epochs, C, l0, a):
             else:
                 w = w - gamma_t * grad_w
 
-        #print(1-x[:,5]*x[:,0:5].dot(w))
-        #print(np.sum(np.fmax(0, 1-x[:,5]*x[:,0:5].dot(w))))
-        #print(x[:,0:5].shape)
-        #print(x[:,5].shape)
-        #print("Iteration:", T+1, 0.5 * w.dot(w) + C * np.sum(np.fmax(0, 1-x[:,5]*x[:,0:5].dot(w))))
         gamma_t = schedule(l0, T+1, a)
 
     return w
 
-def evaluate_perceptron():
+def evaluate_svm():
     train_data = read_examples("bank-note/train.csv")
     test_data = read_examples("bank-note/test.csv")
 
@@ -241,6 +184,8 @@ def evaluate_perceptron():
     l0 = [3e-6, 5e-5]
     a = [6e-3, 5e-5]
 
+    print("Problem 2\n")
+
     x_test = x_test.T
     for i in range(2):
         if i == 0:
@@ -264,6 +209,8 @@ def evaluate_perceptron():
 
         print()
 
+    print("Problem 3 part a\n")
+
     for C in [100/873, 500/873, 700/873]:
         w = svm_dual_form(x_train, C=C)
         test_err = svm_prediction(x_test[:,0:5], x_test[:,5], w)
@@ -281,13 +228,14 @@ def evaluate_perceptron():
 
     prev_vectors = []
 
+    print("Problem 3 parts b and c\n")
+
     for C in [100/873, 500/873, 700/873]:
         for gamma in [0.1, 0.5, 1, 5, 100]:
             a_star = svm_gaussian_kernel(x_train, C=C, gamma=gamma)
             test_err = svm_kernel_prediction(x_test[:,0:5], x_test[:,5], gamma, a_star, C)
             train_err = svm_kernel_prediction(x_train[:,0:5], x_train[:,5], gamma, a_star, C)
             support_vectors = a_star != 0
-            print(a_star)
             num_support_vectors = np.sum(support_vectors)
 
             print_c = None
@@ -312,7 +260,7 @@ def evaluate_perceptron():
                 print("gamma:", gamma, "C:", print_c, "Test Error:", test_err, "Train Error:", train_err, "Number of Support Vectors:", num_support_vectors)
 
 def main():
-    evaluate_perceptron()
+    evaluate_svm()
 
 if __name__ == "__main__":
     main()
