@@ -79,6 +79,27 @@ def svm_prediction(x, y, w):
     err = 1 - (np.sum(predictions == y) / len(y))
     return err
 
+def svm_kernel_prediction(x, y, gamma, a_star, C):
+    w_star_x = np.zeros((1, x.shape[0]))
+    b_star = 0
+    count = 0
+
+    for i in range(x.shape[0]):
+        w_star_x += a_star[i] * y[i] * kernel(x[i], x, gamma)        
+        if (a_star[i] > 0 and a_star[i] < C):
+            count = count + 1
+            w_t_kernel_x_j = 0
+            for j in range(x.shape[0]):
+                w_t_kernel_x_j += y[j] * a_star[j] * kernel(x[i], x[j], gamma)
+
+            b_star += y[i] - w_t_kernel_x_j
+
+    b_star = b_star / count
+
+    predictions = sign(w_star_x + b_star)
+    err = 1 - (np.sum(predictions == y) / len(y))
+    return err
+
 def voted_perceptron_prediction(x, y, return_vals):
     prediction_sum = np.zeros((len(x)))
     for weight, count in return_vals:
@@ -125,6 +146,48 @@ def svm_dual_form(train, C):
     augmented[0] = b_star
     augmented[1:5] = w_star
     return augmented
+
+def kernel(x, z, gamma):
+    if x.ndim == 2:
+        return_val = np.zeros((x.shape[0], z.shape[0]))
+        for i in range(x.shape[0]):
+            x_i = x[i]
+            for j in range(z.shape[0]):
+                z_j = z[j]
+                return_val[i,j] = np.exp(-(np.linalg.norm(x_i - z_j)**2)/gamma)
+
+        return return_val
+    
+    else:
+        if z.ndim == 2:
+            return_val = np.zeros((1, z.shape[0]))
+            for j in range(z.shape[0]):
+                z_j = z[j]
+                return_val[0,j] = np.exp(-(np.linalg.norm(x - z_j)**2)/gamma)
+
+            return return_val
+        
+        else:
+            return np.exp(-(np.linalg.norm(x - z)**2)/gamma)
+
+def svm_gaussian_kernel(train, C, gamma):
+    x = train[:,1:5]
+    y = train[:,5]
+    x_x_y_y = np.outer(y, y) * kernel(x, x, gamma)
+    fun = lambda a: 0.5 * np.sum(np.outer(a, a) * x_x_y_y) - np.sum(a)
+
+    bnds = []
+    guess = []
+
+    for i in range(x.shape[0]):
+        bnds.append((0,C))
+        guess.append(0)
+
+    cons = ({'type': 'eq', 'fun': lambda a: a.dot(y)})
+
+    res = minimize(fun, guess, method='SLSQP', bounds=bnds, constraints=cons)
+
+    return res.x
 
 def svm_gradient_descent(x, num_epochs, C, l0, a):
     w = np.zeros((5,))
@@ -189,16 +252,64 @@ def evaluate_perceptron():
             test_err = svm_prediction(x_test[:,0:5], x_test[:,5], w)
             train_err = svm_prediction(x_train[:,0:5], x_train[:,5], w)
 
-            print("C:", C, "Test Error:", test_err, "Train Error:", train_err)
+            print_c = None
+            if C == 100/873:
+                print_c = "100/873"
+            elif C == 500/873:
+                print_c = "500/873"
+            else:
+                print_c = "700/873"
+
+            print("C:", print_c, "Test Error:", test_err, "Train Error:", train_err, "w:", w)
 
         print()
 
-    print(x_train)
     for C in [100/873, 500/873, 700/873]:
         w = svm_dual_form(x_train, C=C)
         test_err = svm_prediction(x_test[:,0:5], x_test[:,5], w)
         train_err = svm_prediction(x_train[:,0:5], x_train[:,5], w)
-        print("Test Error:", test_err, "Train Error:", train_err)
+
+        print_c = None
+        if C == 100/873:
+            print_c = "100/873"
+        elif C == 500/873:
+            print_c = "500/873"
+        else:
+            print_c = "700/873"
+
+        print("C:", print_c, "Test Error:", test_err, "Train Error:", train_err, "w:", w)
+
+    prev_vectors = []
+
+    for C in [100/873, 500/873, 700/873]:
+        for gamma in [0.1, 0.5, 1, 5, 100]:
+            a_star = svm_gaussian_kernel(x_train, C=C, gamma=gamma)
+            test_err = svm_kernel_prediction(x_test[:,0:5], x_test[:,5], gamma, a_star, C)
+            train_err = svm_kernel_prediction(x_train[:,0:5], x_train[:,5], gamma, a_star, C)
+            support_vectors = a_star != 0
+            print(a_star)
+            num_support_vectors = np.sum(support_vectors)
+
+            print_c = None
+            num_overlap = None
+            if C == 100/873:
+                print_c = "100/873"
+            elif C == 500/873:
+                if len(prev_vectors) != 0:
+                    num_overlap = np.sum(prev_vectors[len(prev_vectors) - 1] * support_vectors)
+
+                prev_vectors.append(support_vectors)
+                print_c = "500/873"
+            else:
+                print_c = "700/873"
+
+            if C == 500/873:
+                if (num_overlap == None):
+                    print("gamma:", gamma, "C:", print_c, "Test Error:", test_err, "Train Error:", train_err, "Number of Support Vectors:" , num_support_vectors, "Overlap with previous: N/A")
+                else:
+                    print("gamma:", gamma, "C:", print_c, "Test Error:", test_err, "Train Error:", train_err, "Number of Support Vectors:" , num_support_vectors, "Overlap with previous:", num_overlap)
+            else:
+                print("gamma:", gamma, "C:", print_c, "Test Error:", test_err, "Train Error:", train_err, "Number of Support Vectors:", num_support_vectors)
 
 def main():
     evaluate_perceptron()
