@@ -74,7 +74,7 @@ def sign(vec):
     signed = np.vectorize(lambda val: -1 if val < 0 else 1)(vec)
     return signed
 
-def perceptron_prediction(x, y, w):
+def svm_prediction(x, y, w):
     predictions = sign(x.dot(w))
     err = 1 - (np.sum(predictions == y) / len(y))
     return err
@@ -109,12 +109,13 @@ def svm_dual_form(train, C):
 
     res = minimize(fun, guess, method='SLSQP', bounds=bnds, constraints=cons)
 
-    w_star = x.T.dot(res.x * y)
+    a_star = res.x
+    w_star = x.T.dot(a_star * y)
 
     count = 0
     b_star = 0
     for i in range(x.shape[0]):
-        if (res.x[i] > 0 and res.x[i] < C):
+        if (a_star[i] > 0 and a_star[i] < C):
             count = count + 1
             b_star = b_star + y[i] - w_star.dot(x[i])
 
@@ -173,42 +174,31 @@ def evaluate_perceptron():
         x_test[1:, counter] = example
         counter += 1
 
-    l0 = [5e-5, 3e-6]
-    a = [5e-5, 6e-3]
+    # values that lead to convergence. l0 and a being the same leads to the schedule in part b
+    l0 = [3e-6, 5e-5]
+    a = [6e-3, 5e-5]
 
     x_test = x_test.T
-    # for i in range(2):
-    #     for C in [100/873, 500/873, 700/873]:
-    #         w = svm_gradient_descent(x_train,num_epochs=100, C=C, l0=l0[i], a=a[i])
-    #         test_err = perceptron_prediction(x_test[:,0:5], x_test[:,5], w)
-    #         train_err = perceptron_prediction(x_train[:,0:5], x_train[:,5], w)
+    for i in range(2):
+        if i == 0:
+            print("Values for the schedule in part a using l0 =", l0[i], "and a =", a[i])
+        else:
+            print("Values for the schedule in part b using l0 =", l0[i])
+        for C in [100/873, 500/873, 700/873]:
+            w = svm_gradient_descent(x_train,num_epochs=100, C=C, l0=l0[i], a=a[i])
+            test_err = svm_prediction(x_test[:,0:5], x_test[:,5], w)
+            train_err = svm_prediction(x_train[:,0:5], x_train[:,5], w)
 
-    #         print("Test Error:", test_err, "Train Error:", train_err)
+            print("C:", C, "Test Error:", test_err, "Train Error:", train_err)
 
+        print()
 
+    print(x_train)
     for C in [100/873, 500/873, 700/873]:
         w = svm_dual_form(x_train, C=C)
-        test_err = perceptron_prediction(x_test[:,0:5], x_test[:,5], w)
-        train_err = perceptron_prediction(x_train[:,0:5], x_train[:,5], w)
+        test_err = svm_prediction(x_test[:,0:5], x_test[:,5], w)
+        train_err = svm_prediction(x_train[:,0:5], x_train[:,5], w)
         print("Test Error:", test_err, "Train Error:", train_err)
-
-    # w = vanilla_perceptron(x_train,r=0.1,num_epochs=10)
-    # vanilla_err = perceptron_prediction(x_test, y_test, w)
-    # print(f"Weight vector for vanilla perceptron: \n\t{w}")
-    # print(f"Prediction error on test set for vanilla perceptron: \n\t{vanilla_err}\n")
-
-    # return_vals = voted_perceptron(x_train,y_train,r=0.1,num_epochs=10)
-    # voted_err = voted_perceptron_prediction(x_test, y_test, return_vals)
-    # print(f"Weight vectors and counts for voted perceptron:")
-    # for weight, count in return_vals:
-    #     print(f"\tWeight: {weight} Count: {count}")
-
-    # print(f"Prediction error on test set for voted perceptron: \n\t{voted_err}\n")
-
-    # a = average_perceptron(x_train,y_train,r=0.1,num_epochs=10)
-    # average_err = perceptron_prediction(x_test, y_test, a)
-    # print(f"Weight vector for average perceptron: \n\t{a}")
-    # print(f"Prediction error on test set for average perceptron: \n\t{average_err}")
 
 def main():
     evaluate_perceptron()
