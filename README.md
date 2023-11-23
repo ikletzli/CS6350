@@ -16,3 +16,5 @@ To run the boosting file, start in the top level directory and run: python3 ./En
 To run the linear regression file, start in the top level directory and run: python3 ./LinearRegression/linear_regression.py.
 
 To run perceptron for HW3, start in the top level directory and run: python3 ./Perceptron/perceptron.py.
+
+To run svm for HW4, start in the top level directory and run: python3 ./SVM/svm.py.
