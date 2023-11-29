@@ -37,6 +37,10 @@ def svm_prediction(x, y, w):
     err = 1 - (np.sum(predictions == y) / len(y))
     return err
 
+def nn_prediction(x, y, y_pred):
+    err = 1 - (np.sum(sign(y_pred) == y) / len(y))
+    return err
+
 def svm_kernel_prediction(x, y, gamma, a_star, C):
     w_star_x = np.zeros((1, x.shape[0]))
     b_star = 0
@@ -146,13 +150,16 @@ def nn_gradient_descent(x, num_epochs, l0, a, hidden_size_1, hidden_size_2, w_h_
             y = example[5]
             this_x = example[0:5]
 
-            cache = forward_pass(this_x, y, hidden_size_1, hidden_size_2, w_h_1, w_h_2, w_o)
+            _, cache, L = forward_pass(this_x, y, hidden_size_1, hidden_size_2, w_h_1, w_h_2, w_o)
             dwo, dw_h_2, dw_h_1 = backward_pass(cache)
 
             w_o = w_o - gamma_t * dwo
             w_h_2 = w_h_2 - gamma_t * dw_h_2
             w_h_1 = w_h_1 - gamma_t * dw_h_1
 
+        y_pred, _, L = forward_pass(x[:,0:5], x[:,5], hidden_size_1, hidden_size_2, w_h_1, w_h_2, w_o)
+        #print(x.shape[0])
+        #print(np.sum(L) / x.shape[0])
         gamma_t = schedule(l0, T+1, a)
 
     return w_h_1, w_h_2, w_o
@@ -162,17 +169,23 @@ def sigmoid(x):
 
 def forward_pass(x, y, hidden_size_1, hidden_size_2, w_h_1, w_h_2, w_o):
     z_1 = np.ones((hidden_size_1 + 1,))
-    s_1 = x.dot(w_h_1)
-    z_1[1:hidden_size_1+1] = sigmoid(s_1)
+    if (x.ndim > 1):
+        z_1 = np.ones((hidden_size_1 + 1,x.shape[0]))
+
     z_2 = np.ones((hidden_size_2 + 1,))
-    s_2 = z_1.dot(w_h_2)
-    z_2[1:hidden_size_2+1] = sigmoid(s_2)
-    y_pred = z_2.dot(w_o)
+    if (x.ndim > 1):
+        z_2 = np.ones((hidden_size_2 + 1,x.shape[0]))
+
+    s_1 = x.dot(w_h_1)
+    z_1[1:hidden_size_1+1] = sigmoid(s_1).T
+    s_2 = z_1.T.dot(w_h_2)
+    z_2[1:hidden_size_2+1] = sigmoid(s_2).T
+    y_pred = z_2.T.dot(w_o)
     L = 0.5 * (y_pred - y) ** 2
 
     cache = (y_pred, y, z_2, w_o, hidden_size_2, s_2, z_1, w_h_2, hidden_size_1, s_1, x, w_h_1)
 
-    return cache
+    return y_pred, cache, L
 
 def backward_pass(cache):
     y_pred, y, z_2, w_o, hidden_size_2, s_2, z_1, w_h_2, hidden_size_1, s_1, x, w_h_1 = cache
@@ -210,11 +223,62 @@ def evaluate_svm():
         x_test[1:, counter] = example
         counter += 1
 
+    x_test = x_test.T
+
+    print("Parameters initialized from standard Gaussian distribution:")
     for width in [5,10,25,50,100]:
+        l0 = 5e-1
+        a = 50
+        if width in [25]:
+            l0 = 5e-2
+            a = 10
+        if width in [50]:
+            l0 = 5e-3
+            a = 10
+        if width in [100]:
+            l0 = 5e-4
+            a = 10
+
+        w_h_1 = np.random.normal(size=(5, width))
+        w_h_2 = np.random.normal(size=(width + 1, width))
+        w_o = np.random.normal(size=(width + 1,))
+        w_h_1, w_h_2, w_o = nn_gradient_descent(x_train, num_epochs=100, l0=l0, a=a, hidden_size_1=width, hidden_size_2=width, w_h_1=w_h_1, w_h_2=w_h_2, w_o=w_o)
+        y_pred, _, L = forward_pass(x_train[:,0:5], x_train[:,5], width, width, w_h_1, w_h_2, w_o)
+        train_err = nn_prediction(x_train[:,0:5], x_train[:,5], y_pred)
+
+        y_pred, _, L = forward_pass(x_test[:,0:5], x_test[:,5], width, width, w_h_1, w_h_2, w_o)
+        test_err = nn_prediction(x_test[:,0:5], x_test[:,5], y_pred)
+
+        print("\tWidth:", width, "Train Error:", train_err, "Test Error:", test_err)
+
+    print("\nParameters initialized to all zeros:")
+    for width in [5,10,25,50,100]:
+        l0 = 5e-2
+        a = 50
+        if width in [10]:
+            l0 = 5e-2
+            a = 10
+        if width in [25]:
+            l0 = 5e-1
+            a = 10
+        if width in [50]:
+            l0 = 3e-1
+            a = 10
+        if width in [100]:
+            l0 = 5e-2
+            a = 0.4
+
         w_h_1 = np.zeros((5, width))
         w_h_2 = np.zeros((width + 1, width))
         w_o = np.zeros((width + 1,))
-        w_h_1, w_h_2, w_o = nn_gradient_descent(x_train, num_epochs=100, l0=5e-5, a=5e-5, hidden_size_1=width, hidden_size_2=width, w_h_1=w_h_1, w_h_2=w_h_2, w_o=w_o)
+        w_h_1, w_h_2, w_o = nn_gradient_descent(x_train, num_epochs=100, l0=l0, a=a, hidden_size_1=width, hidden_size_2=width, w_h_1=w_h_1, w_h_2=w_h_2, w_o=w_o)
+        y_pred, _, L = forward_pass(x_train[:,0:5], x_train[:,5], width, width, w_h_1, w_h_2, w_o)
+        train_err = nn_prediction(x_train[:,0:5], x_train[:,5], y_pred)
+
+        y_pred, _, L = forward_pass(x_test[:,0:5], x_test[:,5], width, width, w_h_1, w_h_2, w_o)
+        test_err = nn_prediction(x_test[:,0:5], x_test[:,5], y_pred)
+
+        print("\tWidth:", width, "Train Error:", train_err, "Test Error:", test_err)
 
 def main():
     evaluate_svm()
