@@ -137,9 +137,7 @@ def svm_gaussian_kernel(train, C, gamma):
 
     return res.x
 
-def svm_gradient_descent(x, num_epochs, C, l0, a):
-    w = np.zeros((5,))
-    
+def nn_gradient_descent(x, num_epochs, l0, a, hidden_size_1, hidden_size_2, w_h_1, w_h_2, w_o):    
     gamma_t = l0
 
     for T in range(num_epochs):
@@ -147,35 +145,37 @@ def svm_gradient_descent(x, num_epochs, C, l0, a):
         for example in x:
             y = example[5]
             this_x = example[0:5]
-            grad_w = np.zeros((5,))
-            grad_w[1:5] = w[1:5]
-            if (y * w.dot(this_x) <= 1):
-                w = w - gamma_t * grad_w + gamma_t * C * x.shape[0] * y * this_x
-            else:
-                w = w - gamma_t * grad_w
+
+            cache = forward_pass(this_x, y, hidden_size_1, hidden_size_2, w_h_1, w_h_2, w_o)
+            dwo, dw_h_2, dw_h_1 = backward_pass(cache)
+
+            w_o = w_o - gamma_t * dwo
+            w_h_2 = w_h_2 - gamma_t * dw_h_2
+            w_h_1 = w_h_1 - gamma_t * dw_h_1
 
         gamma_t = schedule(l0, T+1, a)
 
-    return w
+    return w_h_1, w_h_2, w_o
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
-def forward_pass(x, y, hidden_size_1, hidden_size_2):
-    #forward pass
-    w_h_1 = np.zeros((x.shape[0], hidden_size_1))
+def forward_pass(x, y, hidden_size_1, hidden_size_2, w_h_1, w_h_2, w_o):
     z_1 = np.ones((hidden_size_1 + 1,))
     s_1 = x.dot(w_h_1)
     z_1[1:hidden_size_1+1] = sigmoid(s_1)
-    w_h_2 = np.zeros((hidden_size_1 + 1, hidden_size_2))
     z_2 = np.ones((hidden_size_2 + 1,))
     s_2 = z_1.dot(w_h_2)
     z_2[1:hidden_size_2+1] = sigmoid(s_2)
-    w_o = np.zeros((hidden_size_2 + 1,))
     y_pred = z_2.dot(w_o)
     L = 0.5 * (y_pred - y) ** 2
 
-    #backward pass
+    cache = (y_pred, y, z_2, w_o, hidden_size_2, s_2, z_1, w_h_2, hidden_size_1, s_1, x, w_h_1)
+
+    return cache
+
+def backward_pass(cache):
+    y_pred, y, z_2, w_o, hidden_size_2, s_2, z_1, w_h_2, hidden_size_1, s_1, x, w_h_1 = cache
     dy = y_pred - y
     dwo = z_2 * dy
     dz2 = w_o * dy
@@ -210,9 +210,11 @@ def evaluate_svm():
         x_test[1:, counter] = example
         counter += 1
 
-    #forward_pass(x_train[0,0:5], x_train[0,5], 3, 4)
-
-    forward_pass(np.ones((3,)), np.ones((1)), 2, 2)
+    for width in [5,10,25,50,100]:
+        w_h_1 = np.zeros((5, width))
+        w_h_2 = np.zeros((width + 1, width))
+        w_o = np.zeros((width + 1,))
+        w_h_1, w_h_2, w_o = nn_gradient_descent(x_train, num_epochs=100, l0=5e-5, a=5e-5, hidden_size_1=width, hidden_size_2=width, w_h_1=w_h_1, w_h_2=w_h_2, w_o=w_o)
 
 def main():
     evaluate_svm()
