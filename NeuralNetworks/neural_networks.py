@@ -5,7 +5,8 @@ import math
 import numpy as np
 import random
 from scipy.optimize import minimize
-
+import torch
+from torch import nn
 # converts the examples into a list of maps that map an example's attributes to its values
 def read_examples(file_name):
     attributes = ['variance', 'skewness', 'curtosis', 'entropy', 'label']
@@ -280,8 +281,128 @@ def evaluate_svm():
 
         print("\tWidth:", width, "Train Error:", train_err, "Test Error:", test_err)
 
+def train_loop(x_train, model, loss_fn, optimizer):
+    size = len(x_train)
+    all_X = x_train[:,0:5]
+    all_y = x_train[:,5]
+    model.train()
+
+    for i in range(size):
+        X = all_X[i]
+        y = all_y[i]
+        pred = model(X)
+        loss = loss_fn(pred, y)
+
+        # Backpropagation
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+def test_loop(x_test, model, loss_fn):
+    model.eval()
+    size = len(x_test)
+    test_loss, correct = 0, 0
+    all_X = x_test[:,0:5]
+    all_y = x_test[:,5]
+
+    with torch.no_grad():
+        for i in range(size):
+            X = all_X[i]
+            y = all_y[i]
+            pred = model(X)
+            correct += np.sum(sign(pred.item()) == y.item())
+            test_loss += loss_fn(pred, y).item()
+
+    correct /= size
+    test_loss /= size
+    err = 1 - correct
+    return err
+
+def my_loss(output, target):
+    loss = torch.mean((output - target)**2)
+    return loss
+
+def init_xavier(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight)
+
+def init_he(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.kaiming_normal_(m.weight)
+
+def pytorch_training():
+    train_data = read_examples("bank-note/train.csv")
+    test_data = read_examples("bank-note/test.csv")
+
+    x_train = np.zeros((6, len(train_data)))
+    x_train[0,:] = np.ones(len(train_data))
+
+    counter = 0
+    for example in train_data:
+        x_train[1:, counter] = example
+        counter += 1
+
+    x_train = x_train.T
+
+    x_test = np.zeros((6, len(test_data)))
+    x_test[0,:] = np.ones(len(test_data))
+
+    counter = 0
+    for example in test_data:
+        x_test[1:, counter] = example
+        counter += 1
+
+    x_test = x_test.T
+
+    print("Tanh activation and xavier initialization:")
+    for width in [3,5,9]:
+        for depth in [5,10,25,50,100]:
+            model = nn.Sequential(
+                nn.Linear(5,width),
+                nn.Tanh(),
+                nn.Linear(width,depth),
+                nn.Tanh(),
+                nn.Linear(depth,1),
+            )
+            model.apply(init_xavier)
+
+            loss_fn = my_loss
+            optimizer = torch.optim.Adam(model.parameters())
+
+            epochs = 10
+            for t in range(epochs):
+                train_loop(torch.from_numpy(x_train).float(), model, loss_fn, optimizer)
+            
+            train_err = test_loop(torch.from_numpy(x_train).float(), model, loss_fn)
+            test_err = test_loop(torch.from_numpy(x_test).float(), model, loss_fn)
+            print("\tWidth:", width, "Depth:", depth, "Train Error:", train_err, "Test Error:", test_err)
+
+    print("\nReLU activation and he initialization:")
+    for width in [3,5,9]:
+        for depth in [5,10,25,50,100]:
+            model = nn.Sequential(
+                nn.Linear(5,width),
+                nn.ReLU(),
+                nn.Linear(width,depth),
+                nn.ReLU(),
+                nn.Linear(depth,1),
+            )
+            model.apply(init_he)
+
+            loss_fn = my_loss
+            optimizer = torch.optim.Adam(model.parameters())
+
+            epochs = 10
+            for t in range(epochs):
+                train_loop(torch.from_numpy(x_train).float(), model, loss_fn, optimizer)
+            
+            train_err = test_loop(torch.from_numpy(x_train).float(), model, loss_fn)
+            test_err = test_loop(torch.from_numpy(x_test).float(), model, loss_fn)
+            print("\tWidth:", width, "Depth:", depth, "Train Error:", train_err, "Test Error:", test_err)
+
 def main():
     evaluate_svm()
+    pytorch_training()
 
 if __name__ == "__main__":
     main()
