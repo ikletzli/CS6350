@@ -18,3 +18,5 @@ To run the linear regression file, start in the top level directory and run: pyt
 To run perceptron for HW3, start in the top level directory and run: python3 ./Perceptron/perceptron.py.
 
 To run svm for HW4, start in the top level directory and run: python3 ./SVM/svm.py.
+
+To run the neural networks for HW5, start in the top level directory and run: python3 ./NeuralNetworks/neural_networks.py.
