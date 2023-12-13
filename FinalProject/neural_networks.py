@@ -244,19 +244,19 @@ def pytorch_training():
     print(test.shape)
 
     print("Tanh activation and xavier initialization:")
-    for width in [100,5,9]:
-        for depth in [100,10,25,50,100]:
+    for width in [5,5,9]:
+        for depth in [5,10,25,50,100]:
             model = nn.Sequential(
                 nn.Linear(feature_size,width),
-                nn.Tanh(),
+                nn.ReLU(),
                 nn.Linear(width,depth),
-                nn.Tanh(),
+                nn.ReLU(),
                 nn.Linear(depth,1),
             )
             model.apply(init_xavier)
 
             loss_fn = my_loss
-            optimizer = torch.optim.SGD(model.parameters(), lr=5e-4)
+            optimizer = torch.optim.Adam(model.parameters(), lr=5e-2)
             train_torch = torch.from_numpy(train).float()
             validation_torch = torch.from_numpy(validation).float()
             test_torch = torch.from_numpy(test).float()
