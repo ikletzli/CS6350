@@ -42,10 +42,10 @@ def convert_to_numpy(data, attributes):
         else:
             length += len(val) + 1
 
-    array = np.zeros((len(data),length))
+    array = np.zeros((len(data),length+1))
     for i in range(len(data)):
         example = data[i]
-        features = np.ones((0))
+        features = np.ones((1))
         j = 0
         for key, val in example.items():
             length = 0

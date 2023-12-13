@@ -226,6 +226,8 @@ def evaluate_svm():
 
     x_test = x_test.T
 
+    print(x_train[0])
+
     print("Parameters initialized from standard Gaussian distribution:")
     for width in [5,10,25,50,100]:
         l0 = 5e-1

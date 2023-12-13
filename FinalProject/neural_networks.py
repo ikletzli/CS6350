@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from helper import *
 
-feature_size = 113
+feature_size = 114
 
 def sign(vec):
     signed = np.vectorize(lambda val: -1 if val < 0 else 1)(vec)
@@ -25,7 +25,8 @@ def nn_prediction(x, y, y_pred):
     return err
 
 def schedule(l0, t, a):
-    return l0 / (1 + (l0/a) * t)
+    #return l0 / (1 + (l0/a) * t)
+    return l0
 
 def nn_gradient_descent(x, num_epochs, l0, a, hidden_size_1, hidden_size_2, w_h_1, w_h_2, w_o):    
     gamma_t = l0
@@ -120,8 +121,8 @@ def evaluate_svm():
     # test_y = test[:,feature_size]
 
     print("Parameters initialized from standard Gaussian distribution:")
-    for width in [10]:
-        l0 = 5e-1
+    for width in [50]:
+        l0 = 5e-5
         a = 5e-1
         #a = 50
 
@@ -137,34 +138,34 @@ def evaluate_svm():
 
         print("\tWidth:", width, "Train Error:", train_err, "Validation Error:", validation_err)
 
-    print("\nParameters initialized to all zeros:")
-    for width in [5,10,25,50,100]:
-        l0 = 5e-2
-        a = 50
-        if width in [10]:
-            l0 = 5e-2
-            a = 10
-        if width in [25]:
-            l0 = 5e-1
-            a = 10
-        if width in [50]:
-            l0 = 3e-1
-            a = 10
-        if width in [100]:
-            l0 = 5e-2
-            a = 0.4
+    # print("\nParameters initialized to all zeros:")
+    # for width in [5,10,25,50,100]:
+    #     l0 = 5e-2
+    #     a = 50
+    #     if width in [10]:
+    #         l0 = 5e-2
+    #         a = 10
+    #     if width in [25]:
+    #         l0 = 5e-1
+    #         a = 10
+    #     if width in [50]:
+    #         l0 = 3e-1
+    #         a = 10
+    #     if width in [100]:
+    #         l0 = 5e-2
+    #         a = 0.4
 
-        w_h_1 = np.zeros((feature_size, width))
-        w_h_2 = np.zeros((width + 1, width))
-        w_o = np.zeros((width + 1,))
-        w_h_1, w_h_2, w_o = nn_gradient_descent(x_train, num_epochs=100, l0=l0, a=a, hidden_size_1=width, hidden_size_2=width, w_h_1=w_h_1, w_h_2=w_h_2, w_o=w_o)
-        y_pred, _, L = forward_pass(x_train[:,0:feature_size], x_train[:,feature_size], width, width, w_h_1, w_h_2, w_o)
-        train_err = nn_prediction(x_train[:,0:feature_size], x_train[:,feature_size], y_pred)
+    #     w_h_1 = np.zeros((feature_size, width))
+    #     w_h_2 = np.zeros((width + 1, width))
+    #     w_o = np.zeros((width + 1,))
+    #     w_h_1, w_h_2, w_o = nn_gradient_descent(x_train, num_epochs=100, l0=l0, a=a, hidden_size_1=width, hidden_size_2=width, w_h_1=w_h_1, w_h_2=w_h_2, w_o=w_o)
+    #     y_pred, _, L = forward_pass(x_train[:,0:feature_size], x_train[:,feature_size], width, width, w_h_1, w_h_2, w_o)
+    #     train_err = nn_prediction(x_train[:,0:feature_size], x_train[:,feature_size], y_pred)
 
-        y_pred, _, L = forward_pass(x_test[:,0:feature_size], x_test[:,feature_size], width, width, w_h_1, w_h_2, w_o)
-        test_err = nn_prediction(x_test[:,0:feature_size], x_test[:,feature_size], y_pred)
+    #     y_pred, _, L = forward_pass(x_test[:,0:feature_size], x_test[:,feature_size], width, width, w_h_1, w_h_2, w_o)
+    #     test_err = nn_prediction(x_test[:,0:feature_size], x_test[:,feature_size], y_pred)
 
-        print("\tWidth:", width, "Train Error:", train_err, "Test Error:", test_err)
+    #     print("\tWidth:", width, "Train Error:", train_err, "Test Error:", test_err)
 
 def train_loop(x_train, model, loss_fn, optimizer):
     size = len(x_train)
@@ -174,7 +175,7 @@ def train_loop(x_train, model, loss_fn, optimizer):
     model.train()
 
     pred = model(all_X)
-    loss = loss_fn(pred, all_y)
+    loss = loss_fn(pred, all_y.reshape((all_y.shape[0], 1)))
 
     # Backpropagation
     loss.backward()
@@ -188,21 +189,25 @@ def test_loop(x_test, model, loss_fn):
     all_X = x_test[:,0:feature_size]
     all_y = x_test[:,feature_size]
 
-    labels = []
-    with torch.no_grad():
-        for i in range(size):
-            X = all_X[i]
-            y = all_y[i]
-            pred = model(X)
-            labels.append(pred.item())
-            correct += np.sum(sign(pred.item()) == y.item())
-            test_loss += loss_fn(pred, y).item()
+    pred = model(all_X)
+    test_loss += loss_fn(pred.reshape(pred.shape[0],1), all_y.reshape(all_y.shape[0],1))
 
-    correct /= size
-    test_loss /= size
-    print(test_loss)
-    err = 1 - correct
-    return err, labels
+    # labels = []
+    # with torch.no_grad():
+    #     for i in range(size):
+    #         X = all_X[i]
+    #         y = all_y[i]
+    #         pred = model(X)
+    #         labels.append(pred.item())
+    #         correct += np.sum(sign(pred.item()) == y.item())
+    #         test_loss += loss_fn(pred.reshape(1), y.reshape(1)).item()
+
+    # correct /= size
+    # test_loss /= size
+    # print(test_loss)
+    # err = 1 - correct
+    return test_loss, []
+    # return err, labels
 
 def save_test(x_test, model):
     model.eval()
@@ -241,7 +246,7 @@ def pytorch_training():
     train = train[len(train)//10:,:]
     test = convert_to_numpy(test_data, attributes)
 
-    print(test.shape)
+    print(train[0])
 
     print("Tanh activation and xavier initialization:")
     for width in [5,5,9]:
@@ -255,8 +260,8 @@ def pytorch_training():
             )
             model.apply(init_xavier)
 
-            loss_fn = my_loss
-            optimizer = torch.optim.Adam(model.parameters(), lr=5e-2)
+            loss_fn = nn.BCELoss()
+            optimizer = torch.optim.Adam(model.parameters(), lr=1e-10)
             train_torch = torch.from_numpy(train).float()
             validation_torch = torch.from_numpy(validation).float()
             test_torch = torch.from_numpy(test).float()
@@ -285,10 +290,11 @@ def pytorch_training():
                 nn.Linear(width,depth),
                 nn.ReLU(),
                 nn.Linear(depth,1),
+                nn.Tanh()
             )
             model.apply(init_he)
 
-            loss_fn = my_loss
+            loss_fn = nn.SoftMarginLoss()
             optimizer = torch.optim.Adam(model.parameters())
             train_torch = torch.from_numpy(train).float()
             validation_torch = torch.from_numpy(validation).float()
@@ -308,8 +314,8 @@ def pytorch_training():
             print("\tWidth:", width, "Depth:", depth, "Train Error:", train_err, "Validation Error:", validation_err)
 
 def main():
-    #evaluate_svm()
-    pytorch_training()
+    evaluate_svm()
+    #pytorch_training()
 
 if __name__ == "__main__":
     main()

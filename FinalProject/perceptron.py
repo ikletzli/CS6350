@@ -79,29 +79,18 @@ def evaluate_perceptron():
     # train = train[len(train)//10:,:]
     test = convert_to_numpy(test_data, attributes)
 
-    train_x = train[:,0:113]
-    train_y = train[:,113]
+    train_x = train[:,0:114]
+    train_y = train[:,114]
 
-    validation_x = train[:,0:113]
-    validation_y = train[:,113]
+    validation_x = train[:,0:114]
+    validation_y = train[:,114]
     
-    test_x = test[:,0:113]
+    test_x = test[:,0:114]
     print(test_x[0])
-    test_y = test[:,113]
+    test_y = test[:,114]
 
-    # w = vanilla_perceptron(train_x,train_y,r=0.1,num_epochs=500)
-    # vanilla_err = perceptron_prediction(validation_x, validation_y, w)
-    # print(f"Weight vector for vanilla perceptron: \n\t{w}")
-    # print(f"Prediction error on test set for vanilla perceptron: \n\t{vanilla_err}\n")
-
-    # return_vals = voted_perceptron(train_x,train_y,r=0.1,num_epochs=2)
-    # voted_err = voted_perceptron_prediction(validation_x, validation_y, return_vals)
-
-    # print(f"Prediction error on test set for voted perceptron: \n\t{voted_err}\n")
-
-    a = average_perceptron(train_x,train_y,r=0.001,num_epochs=20)
+    a = average_perceptron(train_x,train_y,r=0.01,num_epochs=50)
     average_err = perceptron_prediction(validation_x, validation_y, a)
-
 
     print(test_x[0])
     print("train", train_x[0])
