@@ -29,6 +29,25 @@ class InformationGain(Purity):
         entropy = sum([p * math.log(p) for p in probabilities])
         return -entropy
 
+class MajorityError(Purity):
+    def purity(self, label_counts, total_count):
+        best_count = 0
+
+        for label, count in label_counts.items():
+            if count > best_count:
+                best_count = count
+
+        return (total_count - best_count) / total_count
+    
+class GiniIndex(Purity):
+    def purity(self, label_counts, total_count):
+        probabilities = []
+        for label, count in label_counts.items():
+            probabilities.append(count / total_count)
+
+        sum_prob_square = sum([p * p for p in probabilities])
+        return 1.0 - sum_prob_square
+
 def get_label_counts(examples):
     label_counts = {}
 
@@ -262,10 +281,21 @@ def bag(train_data, attributes, num_trees, num_samples, num_to_split_on):
             index = random.randint(0, len(train_data) - 1)
             new_examples.append(train_data[index])
 
-        tree = ID3(new_examples, attributes, InformationGain(), -1, num_to_split_on)
+        tree = ID3(new_examples, attributes, MajorityError(), -1, num_to_split_on)
         trees.append(tree)
     
     return trees
+
+# determines percent of correctly predicted labels
+def percent_predicted_correct(tree, examples):
+    num_examples = len(examples)
+    num_right = 0
+    for example in examples:
+        prediction = predict(tree, example)
+        if prediction == example["label"]:
+            num_right = num_right + 1
+
+    return 1 - (num_right / num_examples)
 
 def train_via_decision_tree():
     attributes = read_attributes()
@@ -284,14 +314,20 @@ def train_via_decision_tree():
 
     for example in test_data:
         example['weight'] = 1
+
+    random.shuffle(train_data)
+    validation_data = train_data[0:len(train_data)//10]
+    train_data = train_data[len(train_data)//10:]
     
-    tree = ID3(train_data, attributes, InformationGain(), -1, len(attributes))
+    tree = ID3(train_data, attributes, MajorityError(), -1, 10)
 
     labels = []
     for example in test_data:
         labels.append(predict(tree, example))
 
-    save_csv(labels, "decision_tree")
+    print(percent_predicted_correct(tree, validation_data))
+
+    save_csv(labels, "decision_tree1")
 
 def bagged_prediction(trees, example):
     prediction_counts = {}
@@ -340,18 +376,38 @@ def train_via_bagging():
 
     for example in test_data:
         example['weight'] = 1
+
+    random.shuffle(train_data)
+    validation_data = train_data[0:len(train_data)//10]
+    train_data = train_data[len(train_data)//10:]
+
+    print(len(train_data))
+    print(len(validation_data))
     
-    trees = bag(train_data, attributes, num_trees=500, num_samples=1000, num_to_split_on=None)
+    trees = bag(train_data, attributes, num_trees=1000, num_samples=375, num_to_split_on=None)
 
     labels = []
     for example in test_data:
         labels.append(bagged_prediction(trees, example))
 
+    
+    print(bagging_error(trees, validation_data))
+
     save_csv(labels, "bagged_submission")
+    # trees = bag(train_data, attributes, num_trees=500, num_samples=375, num_to_split_on=None)
+
+    # labels = []
+    # for example in test_data:
+    #     labels.append(bagged_prediction(trees, example))
+
+    
+    # print(bagging_error(trees, validation_data))
+
+    #save_csv(labels, "bagged_submission")
 
 def main():
-    #train_via_decision_tree()
-    train_via_bagging()
+    train_via_decision_tree()
+    #train_via_bagging()
 
 if __name__ == "__main__":
     main()
