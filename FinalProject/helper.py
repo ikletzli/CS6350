@@ -35,22 +35,41 @@ def read_examples(file_name, attributes):
     return examples
 
 def convert_to_numpy(data, attributes):
-    array = np.zeros((len(data),len(data[0])+1))
+    length = 0
+    for key, val in attributes.items():
+        if val[0] == "numeric" or key == "label":
+            length += 1
+        else:
+            length += len(val) + 1
+
+    array = np.zeros((len(data),length))
     for i in range(len(data)):
         example = data[i]
-        features = np.ones((len(data[0])+1))
+        features = np.ones((0))
         j = 0
         for key, val in example.items():
-            feature_val = val
+            length = 0
+            if attributes[key][0] == "numeric" or key == "label":
+                length = 1
+            else:
+                length = len(attributes[key]) + 1
+            
+            feature = np.zeros((length))
             attribute_vals = attributes[key]
             if not (len(attribute_vals) == 1 and attribute_vals[0] == 'numeric'):
                 if key != "label":
+                    feature_val = None
                     if val == "?":
                         feature_val = len(attribute_vals)
                     else:    
                         feature_val = attribute_vals.index(val)
 
-            features[j+1] = feature_val
+                    feature[feature_val] = 1
+
+            if attributes[key][0] == "numeric" or key == "label":
+                feature[0] = val
+
+            features = np.append(features, feature)
             j += 1
         
         array[i] = features
