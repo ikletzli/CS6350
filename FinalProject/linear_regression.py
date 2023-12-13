@@ -5,6 +5,8 @@ import numpy as np
 import random
 from helper import *
 
+feature_size = 15
+
 def batch_gradient_descent(x, y):
     r = 0.01
     w = np.zeros_like(x[0,:])
@@ -64,20 +66,20 @@ def lms():
     train_data = read_examples("income2023f/train_final.csv", attribute_names)
     test_data = read_examples("income2023f/test_final.csv", attribute_names)
 
-    train = convert_to_numpy(train_data, attributes)
+    train = convert_to_numpy_small(train_data, attributes)
     np.random.shuffle(train)
     validation = train[0:len(train)//10,:]
     train = train[len(train)//10:,:]
-    test = convert_to_numpy(test_data, attributes)
+    test = convert_to_numpy_small(test_data, attributes)
 
-    train_x = train[:,0:15]
-    train_y = train[:,15]
+    train_x = train[:,0:feature_size]
+    train_y = train[:,feature_size]
 
-    validation_x = train[:,0:15]
-    validation_y = train[:,15]
+    validation_x = train[:,0:feature_size]
+    validation_y = train[:,feature_size]
     
-    test_x = test[:,0:15]
-    test_y = test[:,15]
+    test_x = test[:,0:feature_size]
+    test_y = test[:,feature_size]
 
     #b_costs, b_w, b_r = batch_gradient_descent(train_x, train_y)
     s_costs, s_w, s_r = stochastic_gradient_descent(train_x, train_y)

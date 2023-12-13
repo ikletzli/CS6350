@@ -7,6 +7,8 @@ import random
 from scipy.optimize import minimize
 from helper import *
 
+feature_size = 15
+
 def sign(vec):
     signed = np.vectorize(lambda val: -1 if val < 0 else 1)(vec)
     return signed
@@ -41,8 +43,8 @@ def schedule(l0, t, a):
     return l0 / (1 + (l0/a) * t)
 
 def svm_dual_form(train, C):
-    x = train[:,1:114]
-    y = train[:,114]
+    x = train[:,1:feature_size]
+    y = train[:,feature_size]
     x_x_y_y = np.outer(y, y) * x.dot(x.T)
     fun = lambda a: 0.5 * np.sum(np.outer(a, a) * x_x_y_y) - np.sum(a)
 
@@ -69,9 +71,9 @@ def svm_dual_form(train, C):
 
     b_star = b_star / count
 
-    augmented = np.zeros((114,))
+    augmented = np.zeros((feature_size,))
     augmented[0] = b_star
-    augmented[1:114] = w_star
+    augmented[1:feature_size] = w_star
     return augmented
 
 def kernel(x, z, gamma):
@@ -98,8 +100,8 @@ def kernel(x, z, gamma):
             return np.exp(-(np.linalg.norm(x - z)**2)/gamma)
 
 def svm_gaussian_kernel(train, C, gamma):
-    x = train[:,1:114]
-    y = train[:,114]
+    x = train[:,1:feature_size]
+    y = train[:,feature_size]
     x_x_y_y = np.outer(y, y) * kernel(x, x, gamma)
     fun = lambda a: 0.5 * np.sum(np.outer(a, a) * x_x_y_y) - np.sum(a)
 
@@ -117,7 +119,7 @@ def svm_gaussian_kernel(train, C, gamma):
     return res.x
 
 def svm_gradient_descent(x, num_epochs, C, l0, a):
-    w = np.zeros((114,))
+    w = np.zeros((feature_size,))
     
     gamma_t = l0
 
@@ -125,9 +127,9 @@ def svm_gradient_descent(x, num_epochs, C, l0, a):
         np.random.shuffle(x)
         for example in x:
             y = example[5]
-            this_x = example[0:114]
-            grad_w = np.zeros((114,))
-            grad_w[1:114] = w[1:114]
+            this_x = example[0:feature_size]
+            grad_w = np.zeros((feature_size,))
+            grad_w[1:feature_size] = w[1:feature_size]
             if (y * w.dot(this_x) <= 1):
                 w = w - gamma_t * grad_w + gamma_t * C * x.shape[0] * y * this_x
             else:
@@ -143,11 +145,11 @@ def evaluate_svm():
     train_data = read_examples("income2023f/train_final.csv", attribute_names)
     test_data = read_examples("income2023f/test_final.csv", attribute_names)
 
-    train = convert_to_numpy(train_data, attributes)
+    train = convert_to_numpy_small(train_data, attributes)
     np.random.shuffle(train)
     validation = train[0:len(train)//10,:]
     train = train[len(train)//10:,:]
-    test = convert_to_numpy(test_data, attributes)
+    test = convert_to_numpy_small(test_data, attributes)
     
     #train_x = train[:,0:feature_size]
     # train_y = train[:,feature_size]
@@ -171,8 +173,8 @@ def evaluate_svm():
             print("Values for the schedule in part b using l0 =", l0[i])
         for C in [100/873, 500/873, 700/873]:
             w = svm_gradient_descent(train,num_epochs=100, C=C, l0=l0[i], a=a[i])
-            test_err = svm_prediction(validation[:,0:114], validation[:,114], w)
-            train_err = svm_prediction(train[:,0:114], train[:,114], w)
+            test_err = svm_prediction(validation[:,0:feature_size], validation[:,feature_size], w)
+            train_err = svm_prediction(train[:,0:feature_size], train[:,feature_size], w)
 
             print_c = None
             if C == 100/873:
@@ -190,8 +192,8 @@ def evaluate_svm():
 
     for C in [100/873, 500/873, 700/873]:
         w = svm_dual_form(train, C=C)
-        test_err = svm_prediction(validation[:,0:114], validation[:,114], w)
-        train_err = svm_prediction(train[:,0:114], train[:,114], w)
+        test_err = svm_prediction(validation[:,0:feature_size], validation[:,feature_size], w)
+        train_err = svm_prediction(train[:,0:feature_size], train[:,feature_size], w)
 
         print_c = None
         if C == 100/873:
@@ -210,8 +212,8 @@ def evaluate_svm():
     for C in [100/873, 500/873, 700/873]:
         for gamma in [0.1, 0.5, 1, 5, 100]:
             a_star = svm_gaussian_kernel(train, C=C, gamma=gamma)
-            test_err = svm_kernel_prediction(validation[:,0:114], validation[:,114], gamma, a_star, C)
-            train_err = svm_kernel_prediction(train[:,0:114], train[:,114], gamma, a_star, C)
+            test_err = svm_kernel_prediction(validation[:,0:feature_size], validation[:,feature_size], gamma, a_star, C)
+            train_err = svm_kernel_prediction(train[:,0:feature_size], train[:,feature_size], gamma, a_star, C)
             support_vectors = a_star != 0
             num_support_vectors = np.sum(support_vectors)
 

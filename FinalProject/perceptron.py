@@ -6,6 +6,8 @@ import numpy as np
 import random
 from helper import *
 
+feature_size = 15
+
 def vanilla_perceptron(x, y, r, num_epochs):
     w = np.zeros_like(x[0])
 
@@ -73,21 +75,21 @@ def evaluate_perceptron():
     train_data = read_examples("income2023f/train_final.csv", attribute_names)
     test_data = read_examples("income2023f/test_final.csv", attribute_names)
 
-    train = convert_to_numpy(train_data, attributes)
+    train = convert_to_numpy_small(train_data, attributes)
     # np.random.shuffle(train)
     # validation = train[0:len(train)//10,:]
     # train = train[len(train)//10:,:]
-    test = convert_to_numpy(test_data, attributes)
+    test = convert_to_numpy_small(test_data, attributes)
 
-    train_x = train[:,0:114]
-    train_y = train[:,114]
+    train_x = train[:,0:feature_size]
+    train_y = train[:,feature_size]
 
-    validation_x = train[:,0:114]
-    validation_y = train[:,114]
+    validation_x = train[:,0:feature_size]
+    validation_y = train[:,feature_size]
     
-    test_x = test[:,0:114]
+    test_x = test[:,0:feature_size]
     print(test_x[0])
-    test_y = test[:,114]
+    test_y = test[:,feature_size]
 
     a = average_perceptron(train_x,train_y,r=0.01,num_epochs=50)
     average_err = perceptron_prediction(validation_x, validation_y, a)

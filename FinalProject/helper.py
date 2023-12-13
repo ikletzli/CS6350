@@ -34,7 +34,7 @@ def read_examples(file_name, attributes):
     
     return examples
 
-def convert_to_numpy(data, attributes):
+def convert_to_numpy_large(data, attributes):
     length = 0
     for key, val in attributes.items():
         if val[0] == "numeric" or key == "label":
@@ -74,6 +74,28 @@ def convert_to_numpy(data, attributes):
         
         array[i] = features
     
+    return array
+
+def convert_to_numpy_small(data, attributes):
+    array = np.zeros((len(data),len(data[0])+1))
+    for i in range(len(data)):
+        example = data[i]
+        features = np.ones((len(data[0])+1))
+        j = 0
+        for key, val in example.items():
+            feature_val = val
+            attribute_vals = attributes[key]
+            if not (len(attribute_vals) == 1 and attribute_vals[0] == 'numeric'):
+                if key != "label":
+                    if val == "?":
+                        feature_val = len(attribute_vals)
+                    else:    
+                        feature_val = attribute_vals.index(val)
+
+            features[j+1] = feature_val
+            j += 1
+
+        array[i] = features
     return array
 
 # reads the attributes for the income data
