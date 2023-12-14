@@ -1,7 +1,6 @@
 import os
 import sys
 import math
-#import matplotlib.pyplot as plt
 import numpy as np
 import random
 from helper import *
@@ -76,30 +75,33 @@ def evaluate_perceptron():
     test_data = read_examples("income2023f/test_final.csv", attribute_names)
 
     train = convert_to_numpy_small(train_data, attributes)
-    # np.random.shuffle(train)
-    # validation = train[0:len(train)//10,:]
-    # train = train[len(train)//10:,:]
+    np.random.shuffle(train)
+    validation = train[0:len(train)//10,:]
+    train = train[len(train)//10:,:]
     test = convert_to_numpy_small(test_data, attributes)
 
     train_x = train[:,0:feature_size]
     train_y = train[:,feature_size]
 
-    validation_x = train[:,0:feature_size]
-    validation_y = train[:,feature_size]
+    validation_x = validation[:,0:feature_size]
+    validation_y = validation[:,feature_size]
     
     test_x = test[:,0:feature_size]
-    print(test_x[0])
     test_y = test[:,feature_size]
+
+    # w = vanilla_perceptron(train_x,train_y,r=0.01,num_epochs=50)
+    # vanilla_err = perceptron_prediction(validation_x, validation_y, w)
+    # print(f"Prediction error on validation set for vanilla perceptron: {vanilla_err}")
+
+    # return_vals = voted_perceptron(train_x,train_y,r=0.01,num_epochs=50)
+    # voted_err = voted_perceptron_prediction(validation_x, validation_y, return_vals)
+    # print(f"Prediction error on validation set for voted perceptron: {voted_err}")
 
     a = average_perceptron(train_x,train_y,r=0.01,num_epochs=50)
     average_err = perceptron_prediction(validation_x, validation_y, a)
-
-    print(test_x[0])
-    print("train", train_x[0])
+    print(f"Prediction error on validation set for average perceptron: {average_err}")
     predictions = sign(test_x.dot(a))
-    save_csv(predictions, "perceptron1")
-    print(f"Weight vector for average perceptron: \n\t{a}")
-    print(f"Prediction error on test set for average perceptron: \n\t{average_err}")
+    save_csv(predictions, "best_perceptron")
 
 def main():
     evaluate_perceptron()

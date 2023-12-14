@@ -380,9 +380,6 @@ def train_via_bagging():
     random.shuffle(train_data)
     validation_data = train_data[0:len(train_data)//10]
     train_data = train_data[len(train_data)//10:]
-
-    print(len(train_data))
-    print(len(validation_data))
     
     trees = bag(train_data, attributes, num_trees=1000, num_samples=375, num_to_split_on=None)
 
@@ -390,24 +387,13 @@ def train_via_bagging():
     for example in test_data:
         labels.append(bagged_prediction(trees, example))
 
-    
     print(bagging_error(trees, validation_data))
 
     save_csv(labels, "bagged_submission")
-    # trees = bag(train_data, attributes, num_trees=500, num_samples=375, num_to_split_on=None)
-
-    # labels = []
-    # for example in test_data:
-    #     labels.append(bagged_prediction(trees, example))
-
-    
-    # print(bagging_error(trees, validation_data))
-
-    #save_csv(labels, "bagged_submission")
 
 def main():
-    train_via_decision_tree()
-    #train_via_bagging()
+    #train_via_decision_tree()
+    train_via_bagging()
 
 if __name__ == "__main__":
     main()
