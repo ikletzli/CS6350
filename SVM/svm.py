@@ -184,6 +184,8 @@ def evaluate_svm():
     l0 = [3e-6, 5e-5]
     a = [6e-3, 5e-5]
 
+    print(x_train[0])
+
     print("Problem 2\n")
 
     x_test = x_test.T
