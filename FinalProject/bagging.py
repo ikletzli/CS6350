@@ -200,6 +200,61 @@ def ID3(examples, attributes_and_vals, purity_measure, max_depth, num_to_split_o
     root_node.children = children_of_root
     return root_node
 
+# converts numeric data to categorical by comparing numeric values to median and 
+# determining if the value is bigger or smaller than the median
+def numeric_to_categorical_four(train_data, test_data, attributes):
+    for name, vals in attributes.items():
+        if vals[0] == 'numeric':
+            numeric_vals = []
+            for example in train_data:
+                numeric_vals.append(float(example[name]))
+            
+            numeric_vals = sorted(numeric_vals)
+            mid = int(len(numeric_vals) / 2)
+            median = numeric_vals[mid]
+            if len(numeric_vals) % 2 == 0:
+                median = (median + numeric_vals[mid - 1]) / 2
+
+
+            bottom_half = numeric_vals[0:mid]
+            top_half = numeric_vals[mid:]
+
+            bottom_mid = int(len(bottom_half) / 2)
+            q1 = bottom_half[bottom_mid]
+            if len(bottom_half) % 2 == 0:
+                q1 = (q1 + bottom_half[bottom_mid - 1]) / 2
+
+            top_mid = int(len(top_half) / 2)
+            q3 = top_half[top_mid]
+            if len(top_half) % 2 == 0:
+                q3 = (q3 + top_half[top_mid - 1]) / 2
+
+            for example in train_data:
+                if float(example[name]) > median:
+                    if float(example[name]) > q3:
+                        example[name] = 'q4'
+                    else:
+                        example[name] = 'q3'
+                else:
+                    if float(example[name]) > q1:
+                        example[name] = 'q2'
+                    else:
+                        example[name] = 'q1'
+
+            for example in test_data:
+                if float(example[name]) > median:
+                    if float(example[name]) > q3:
+                        example[name] = 'q4'
+                    else:
+                        example[name] = 'q3'
+                else:
+                    if float(example[name]) > q1:
+                        example[name] = 'q2'
+                    else:
+                        example[name] = 'q1'
+            
+            attributes[name] = ['q1', 'q2', 'q3', 'q4']
+
 # updates unknown values with the majority label for that attribute
 def update_unknown_values(train_data, test_data, attributes):
     majority_values = {}
@@ -234,6 +289,66 @@ def update_unknown_values(train_data, test_data, attributes):
         for attr, val in example.items():
             if val == '?':
                 example[attr] = majority_values[attr]
+
+# updates unknown values with the majority label for that attribute
+def update_unknown_values_by_label(train_data, test_data, attributes):
+    majority_values_positive = {}
+    majority_values_negative = {}
+
+    for name, vals in attributes.items():
+        majority_values_positive[name] = {}
+        majority_values_negative[name] = {}
+        for val in vals:
+            majority_values_positive[name][val] = 0
+            majority_values_negative[name][val] = 0
+
+    for example in train_data:
+        for name, val in example.items():
+            if name != 'label':
+                if val != '?':
+                    label = str(example["label"])
+                    if label == "-1":
+                        majority_values_negative[name][val] = majority_values_negative[name][val] + 1
+                    else:
+                        majority_values_positive[name][val] = majority_values_positive[name][val] + 1
+    
+    for attr, val_counts in majority_values_negative.items():
+        best_count = 0
+        best_val = ""
+        for val, count in val_counts.items():
+            if count > best_count:
+                best_count = count
+                best_val = val
+        
+        majority_values_negative[attr] = best_val
+
+    for attr, val_counts in majority_values_positive.items():
+        best_count = 0
+        best_val = ""
+        for val, count in val_counts.items():
+            if count > best_count:
+                best_count = count
+                best_val = val
+        
+        majority_values_positive[attr] = best_val
+
+    for example in train_data:
+        for attr, val in example.items():
+            if val == '?':
+                label = str(example["label"])
+                if label == "-1":
+                    example[attr] = majority_values_negative[attr]
+                else:
+                    example[attr] = majority_values_positive[attr]
+
+    for example in test_data:
+        for attr, val in example.items():
+            if val == '?':
+                label = str(example["label"])
+                if label == "-1":
+                    example[attr] = majority_values_negative[attr]
+                else:
+                    example[attr] = majority_values_positive[attr]
 
 # get the prediction from the decision tree for the example
 def predict(tree, example):
@@ -365,11 +480,11 @@ def train_via_bagging():
     train_data = read_examples("income2023f/train_final.csv", attribute_names)
     test_data = read_examples("income2023f/test_final.csv", attribute_names)
 
-    numeric_to_categorical(train_data, test_data, attributes)
+    numeric_to_categorical_four(train_data, test_data, attributes)
 
     attributes.pop('label')
 
-    update_unknown_values(train_data, test_data, attributes)
+    update_unknown_values_by_label(train_data, test_data, attributes)
 
     for example in train_data:
         example['weight'] = 1
@@ -389,7 +504,7 @@ def train_via_bagging():
 
     print(bagging_error(trees, validation_data))
 
-    save_csv(labels, "bagged_submission")
+    save_csv(labels, "best_bagged")
 
 def main():
     #train_via_decision_tree()

@@ -26,6 +26,25 @@ class InformationGain(Purity):
 
         entropy = sum([p * math.log(p) for p in probabilities])
         return -entropy
+    
+class MajorityError(Purity):
+    def purity(self, label_counts, total_count):
+        best_count = 0
+
+        for label, count in label_counts.items():
+            if count > best_count:
+                best_count = count
+
+        return (total_count - best_count) / total_count
+    
+class GiniIndex(Purity):
+    def purity(self, label_counts, total_count):
+        probabilities = []
+        for label, count in label_counts.items():
+            probabilities.append(count / total_count)
+
+        sum_prob_square = sum([p * p for p in probabilities])
+        return 1.0 - sum_prob_square
 
 def get_label_counts(examples):
     label_counts = {}
@@ -180,7 +199,7 @@ def percent_predicted_correct(tree, examples):
 
 # converts numeric data to categorical by comparing numeric values to median and 
 # determining if the value is bigger or smaller than the median
-def numeric_to_categorical(train_data, test_data, attributes):
+def numeric_to_categorical_two(train_data, test_data, attributes):
     for name, vals in attributes.items():
         if vals[0] == 'numeric':
             numeric_vals = []
@@ -206,6 +225,61 @@ def numeric_to_categorical(train_data, test_data, attributes):
                     example[name] = 'smaller'
             
             attributes[name] = ['bigger', 'smaller']
+
+# converts numeric data to categorical by comparing numeric values to median and 
+# determining if the value is bigger or smaller than the median
+def numeric_to_categorical_four(train_data, test_data, attributes):
+    for name, vals in attributes.items():
+        if vals[0] == 'numeric':
+            numeric_vals = []
+            for example in train_data:
+                numeric_vals.append(float(example[name]))
+            
+            numeric_vals = sorted(numeric_vals)
+            mid = int(len(numeric_vals) / 2)
+            median = numeric_vals[mid]
+            if len(numeric_vals) % 2 == 0:
+                median = (median + numeric_vals[mid - 1]) / 2
+
+
+            bottom_half = numeric_vals[0:mid]
+            top_half = numeric_vals[mid:]
+
+            bottom_mid = int(len(bottom_half) / 2)
+            q1 = bottom_half[bottom_mid]
+            if len(bottom_half) % 2 == 0:
+                q1 = (q1 + bottom_half[bottom_mid - 1]) / 2
+
+            top_mid = int(len(top_half) / 2)
+            q3 = top_half[top_mid]
+            if len(top_half) % 2 == 0:
+                q3 = (q3 + top_half[top_mid - 1]) / 2
+
+            for example in train_data:
+                if float(example[name]) > median:
+                    if float(example[name]) > q3:
+                        example[name] = 'q4'
+                    else:
+                        example[name] = 'q3'
+                else:
+                    if float(example[name]) > q1:
+                        example[name] = 'q2'
+                    else:
+                        example[name] = 'q1'
+
+            for example in test_data:
+                if float(example[name]) > median:
+                    if float(example[name]) > q3:
+                        example[name] = 'q4'
+                    else:
+                        example[name] = 'q3'
+                else:
+                    if float(example[name]) > q1:
+                        example[name] = 'q2'
+                    else:
+                        example[name] = 'q1'
+            
+            attributes[name] = ['q1', 'q2', 'q3', 'q4']
 
 def ada_prediction(votes, classifiers, example):
     sum = 0
@@ -269,6 +343,67 @@ def update_unknown_values(train_data, test_data, attributes):
         for attr, val in example.items():
             if val == '?':
                 example[attr] = majority_values[attr]
+
+# updates unknown values with the majority label for that attribute
+def update_unknown_values_by_label(train_data, test_data, attributes):
+    majority_values_positive = {}
+    majority_values_negative = {}
+
+    for name, vals in attributes.items():
+        majority_values_positive[name] = {}
+        majority_values_negative[name] = {}
+        for val in vals:
+            majority_values_positive[name][val] = 0
+            majority_values_negative[name][val] = 0
+
+    for example in train_data:
+        for name, val in example.items():
+            if name != 'label':
+                if val != '?':
+                    label = str(example["label"])
+                    if label == "-1":
+                        majority_values_negative[name][val] = majority_values_negative[name][val] + 1
+                    else:
+                        majority_values_positive[name][val] = majority_values_positive[name][val] + 1
+    
+    for attr, val_counts in majority_values_negative.items():
+        best_count = 0
+        best_val = ""
+        for val, count in val_counts.items():
+            if count > best_count:
+                best_count = count
+                best_val = val
+        
+        majority_values_negative[attr] = best_val
+
+    for attr, val_counts in majority_values_positive.items():
+        best_count = 0
+        best_val = ""
+        for val, count in val_counts.items():
+            if count > best_count:
+                best_count = count
+                best_val = val
+        
+        majority_values_positive[attr] = best_val
+
+    for example in train_data:
+        for attr, val in example.items():
+            if val == '?':
+                label = str(example["label"])
+                if label == "-1":
+                    example[attr] = majority_values_negative[attr]
+                else:
+                    example[attr] = majority_values_positive[attr]
+
+    for example in test_data:
+        for attr, val in example.items():
+            if val == '?':
+                label = str(example["label"])
+                if label == "-1":
+                    example[attr] = majority_values_negative[attr]
+                else:
+                    example[attr] = majority_values_positive[attr]
+
 def sign(vec):
     signed = np.vectorize(lambda val: -1 if val < 0 else 1)(vec)
     return signed
@@ -279,11 +414,11 @@ def evaluate_bank_tree():
     train_data = read_examples("income2023f/train_final.csv", attribute_names)
     test_data = read_examples("income2023f/test_final.csv", attribute_names)
 
-    numeric_to_categorical(train_data, test_data, attributes)
+    numeric_to_categorical_four(train_data, test_data, attributes)
 
     attributes.pop('label')
 
-    update_unknown_values(train_data, test_data, attributes)
+    update_unknown_values_by_label(train_data, test_data, attributes)
 
     xpoints = []
     test_errs = []
@@ -291,10 +426,7 @@ def evaluate_bank_tree():
     individual_test_errs = []
     individual_train_errs = []
 
-    num_iterations = 20
-
-    if (len(sys.argv) > 1):
-        num_iterations = int(sys.argv[1])
+    num_iterations = 250
 
     random.shuffle(train_data)
     validation_data = train_data[0:len(train_data)//10]
@@ -302,24 +434,24 @@ def evaluate_bank_tree():
 
     print(f"Evalutating AdaBoost for {num_iterations} iterations:\n")
 
-    for t in range(num_iterations):
-        xpoints.append(t + 1)
-        votes, classifiers, train_errors, test_errors = ada_boost(train_data, validation_data, attributes, t + 1)
-        test_err, train_err = print_err_for_one_depth(train_data, validation_data, votes, classifiers, t + 1)
+    for depth in [1]:
+        xpoints.append(num_iterations)
+        votes, classifiers, train_errors, test_errors = ada_boost(train_data, validation_data, attributes, num_iterations,depth)
+        test_err, train_err = print_err_for_one_depth(train_data, validation_data, votes, classifiers, num_iterations)
         test_errs.append(test_err)
         train_errs.append(train_err)
         individual_test_errs.append(test_errors)
         individual_train_errs.append(train_errors)
 
-    labels = []
-    for example in test_data:
-        sum = 0
-        for i in range(len(classifiers)):
-            sum += votes[i] * predict(classifiers[i], example)
-        
-        labels.append(sign(sum))
+        labels = []
+        for example in test_data:
+            sum = 0
+            for i in range(len(classifiers)):
+                sum += votes[i] * predict(classifiers[i], example)
+            
+            labels.append(sign(sum))
 
-    save_csv(labels, "boosting")
+        save_csv(labels, "best_boosting1")
     xpoints = np.array(xpoints)
 
     plt.title("Test and Train Error for AdaBoost")
@@ -356,7 +488,7 @@ def get_err_for_one_classifier(train_data, test_data, classifier):
     test_err = percent_predicted_correct(classifier, test_data)
     return train_err, test_err
 
-def ada_boost(train_data, test_data, attributes, T):
+def ada_boost(train_data, test_data, attributes, T, depth):
     weights = [1 / len(train_data)] * len(train_data) 
 
     for i in range(len(train_data)):
@@ -367,7 +499,7 @@ def ada_boost(train_data, test_data, attributes, T):
     train_errors = [0] * T
     test_errors = [0] * T
     for t in range(T):
-        tree = ID3(train_data, attributes, InformationGain(), 1)
+        tree = ID3(train_data, attributes, MajorityError(), depth)
         classifiers[t] = tree
 
         train_err, test_err = get_err_for_one_classifier(train_data, test_data, tree)
